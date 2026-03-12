@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:SaveMed/core/utils/input_formatters.dart';
 import 'package:SaveMed/models/cart_item.dart';
+
 import '../services/order_service.dart';
 
 class OrderController extends ChangeNotifier {
@@ -9,6 +10,7 @@ class OrderController extends ChangeNotifier {
   bool loading = false;
   List<dynamic> orders = [];
   int? currentOrderId;
+  Map<String, dynamic>? currentOrder;
 
   Future<int> createOrder({
     required int customerId,
@@ -55,6 +57,16 @@ class OrderController extends ChangeNotifier {
     notifyListeners();
 
     orders = await _service.getOrdersByCustomer(customerId);
+
+    loading = false;
+    notifyListeners();
+  }
+
+  Future<void> loadOrderDetail(int orderId) async {
+    loading = true;
+    notifyListeners();
+
+    currentOrder = await _service.getOrderDetail(orderId);
 
     loading = false;
     notifyListeners();

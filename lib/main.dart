@@ -14,7 +14,7 @@ import 'core/controllers/inventory_controller.dart';
 import 'core/services/category_service.dart';
 import 'core/services/inventory_service.dart';
 import 'core/theme/app_theme.dart';
-import 'features/home/home_page.dart';
+import 'features/auth/auth_page.dart';
 
 void main() {
   runApp(const MyApp());
@@ -43,11 +43,7 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => AddressController()),
         ChangeNotifierProvider(create: (_) => CartController()),
         ChangeNotifierProvider(
-          create: (context) {
-            final auth = AuthController();
-            auth.restoreSession(context);
-            return auth;
-          },
+          create: (_) => AuthController(),
         ),
 
         ChangeNotifierProvider(create: (_) => OrderController()),
@@ -59,9 +55,6 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => CardController()),
 
         ChangeNotifierProvider(create: (_) => PaymentController()),
-        ChangeNotifierProvider(
-          create: (_) => HomeInventoryController()..load(),
-        ),
 
         ChangeNotifierProvider(
           create: (context) =>
@@ -71,7 +64,7 @@ class MyApp extends StatelessWidget {
       child: MaterialApp(
         debugShowCheckedModeBanner: false,
         theme: AppTheme.light,
-        home: const HomePage(),
+        home: const AuthPage(),
       ),
     );
   }

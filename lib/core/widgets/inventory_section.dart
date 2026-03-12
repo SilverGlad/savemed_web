@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+
 import '../../models/inventory_item.dart';
+import '../theme/app_colors.dart';
 import 'inventory_card.dart';
 
 class InventorySection extends StatefulWidget {
@@ -24,6 +26,8 @@ class _InventorySectionState extends State<InventorySection> {
 
   @override
   Widget build(BuildContext context) {
+    final isMobile = MediaQuery.of(context).size.width <= 700;
+
     if (widget.loading) {
       return const Padding(
         padding: EdgeInsets.all(24),
@@ -35,26 +39,36 @@ class _InventorySectionState extends State<InventorySection> {
       return const SizedBox.shrink();
     }
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+    return Container(
+      margin: EdgeInsets.fromLTRB(isMobile ? 12 : 24, 0, isMobile ? 12 : 24, 18),
+      padding: EdgeInsets.all(isMobile ? 18 : 24),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: AppColors.border),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            widget.title,
-            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 16),
-
+          if (widget.title.isNotEmpty) ...[
+            Text(
+              widget.title,
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              'Selecao pensada para compra rapida e leitura facil no celular.',
+              style: TextStyle(color: AppColors.textLight),
+            ),
+            const SizedBox(height: 18),
+          ],
           SizedBox(
-            height: 360,
+            height: isMobile ? 308 : 356,
             child: GestureDetector(
               behavior: HitTestBehavior.translucent,
-
               onHorizontalDragStart: (details) {
                 _lastDragX = details.globalPosition.dx;
               },
-
               onHorizontalDragUpdate: (details) {
                 final dx = details.globalPosition.dx;
                 final delta = _lastDragX - dx;
@@ -68,13 +82,12 @@ class _InventorySectionState extends State<InventorySection> {
 
                 _lastDragX = dx;
               },
-
               child: ListView.separated(
                 controller: _scrollController,
                 scrollDirection: Axis.horizontal,
                 physics: const ClampingScrollPhysics(),
                 itemCount: widget.items.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 16),
+                separatorBuilder: (_, __) => SizedBox(width: isMobile ? 12 : 16),
                 itemBuilder: (_, index) {
                   return InventoryCard(item: widget.items[index]);
                 },

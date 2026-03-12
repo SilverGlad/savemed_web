@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../theme/app_colors.dart';
+
 class SaveMedFooter extends StatelessWidget {
   const SaveMedFooter({super.key});
 
@@ -12,38 +14,32 @@ class SaveMedFooter extends StatelessWidget {
         return Container(
           width: double.infinity,
           padding: EdgeInsets.symmetric(
-            horizontal: isMobile ? 20 : 48,
-            vertical: 32,
+            horizontal: isMobile ? 20 : 36,
+            vertical: isMobile ? 26 : 34,
           ),
-          color: const Color(0xFFF7F7F7),
+          decoration: BoxDecoration(
+            color: AppColors.primaryDark,
+            borderRadius: BorderRadius.circular(isMobile ? 28 : 32),
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // =====================
-              // CONTEÚDO PRINCIPAL
-              // =====================
               if (isMobile) ...[
                 _brandBlock(),
-                const SizedBox(height: 24),
+                const SizedBox(height: 22),
                 _footerColumn(
                   title: 'Institucional',
-                  items: ['Quem Somos', 'Missão e Visão'],
+                  items: const ['Quem somos', 'Missao e visao'],
                   expanded: false,
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 18),
                 _footerColumn(
-                  title: 'Segurança e Privacidade',
-                  items: ['Política de Privacidade', 'Trocas e Devoluções'],
+                  title: 'Suporte',
+                  items: const ['Privacidade', 'Trocas e devolucoes'],
                   expanded: false,
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 18),
                 _paymentBlock(),
-                const SizedBox(height: 20),
-                _footerColumn(
-                  title: 'Central de Atendimento',
-                  items: ['Fale Conosco'],
-                  expanded: false,
-                ),
               ] else
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -51,31 +47,23 @@ class SaveMedFooter extends StatelessWidget {
                     Expanded(flex: 2, child: _brandBlock()),
                     _footerColumn(
                       title: 'Institucional',
-                      items: ['Quem Somos', 'Missão e Visão'],
+                      items: const ['Quem somos', 'Missao e visao'],
                     ),
                     _footerColumn(
-                      title: 'Segurança e Privacidade',
-                      items: ['Política de Privacidade', 'Trocas e Devoluções'],
+                      title: 'Suporte',
+                      items: const ['Privacidade', 'Trocas e devolucoes'],
                     ),
                     Expanded(child: _paymentBlock()),
-                    _footerColumn(
-                      title: 'Central de Atendimento',
-                      items: ['Fale Conosco'],
-                    ),
                   ],
                 ),
-
-              const SizedBox(height: 32),
-              const Divider(),
-
-              // =====================
-              // COPYRIGHT
-              // =====================
-              Center(
-                child: Text(
-                  'SaveMed | CNPJ: 62.250.078/0001-11 | Todos os direitos reservados.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+              const SizedBox(height: 26),
+              Divider(color: Colors.white.withValues(alpha: 0.18)),
+              const SizedBox(height: 18),
+              Text(
+                'SaveMed | CNPJ: 62.250.078/0001-11 | Todos os direitos reservados.',
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.7),
+                  fontSize: 12,
                 ),
               ),
             ],
@@ -91,22 +79,25 @@ class SaveMedFooter extends StatelessWidget {
       children: [
         Row(
           children: [
-            Image.asset('assets/images/logo.png', height: 32),
-            const SizedBox(width: 8),
+            Image.asset('assets/images/logo.png', height: 34),
+            const SizedBox(width: 10),
             const Text(
               'SaveMed',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+                color: Colors.white,
+              ),
             ),
           ],
         ),
-        const SizedBox(height: 16),
-        Row(
-          children: const [
-            Icon(Icons.facebook, size: 18),
-            SizedBox(width: 12),
-            Icon(Icons.camera_alt, size: 18),
-            SizedBox(width: 12),
-          ],
+        const SizedBox(height: 12),
+        Text(
+          'Saude, beleza e conveniencia com uma experiencia mais clara e mais humana.',
+          style: TextStyle(
+            color: Colors.white.withValues(alpha: 0.76),
+            height: 1.35,
+          ),
         ),
       ],
     );
@@ -117,13 +108,16 @@ class SaveMedFooter extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Formas de Pagamento',
-          style: TextStyle(fontWeight: FontWeight.bold),
+          'Formas de pagamento',
+          style: TextStyle(
+            fontWeight: FontWeight.w700,
+            color: Colors.white,
+          ),
         ),
         const SizedBox(height: 12),
         Wrap(
-          spacing: 12,
-          runSpacing: 12,
+          spacing: 10,
+          runSpacing: 10,
           children: [
             _paymentIcon('assets/cards/visa.png'),
             _paymentIcon('assets/cards/mastercard.png'),
@@ -131,17 +125,17 @@ class SaveMedFooter extends StatelessWidget {
             _paymentIcon('assets/cards/amex.png'),
             _paymentIcon('assets/cards/hipercard.png'),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.green),
+                color: AppColors.accent,
+                borderRadius: BorderRadius.circular(999),
               ),
               child: const Text(
                 'PIX',
                 style: TextStyle(
                   fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.green,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textDark,
                 ),
               ),
             ),
@@ -153,13 +147,12 @@ class SaveMedFooter extends StatelessWidget {
 
   Widget _paymentIcon(String asset) {
     return Container(
-      width: 44,
-      height: 32,
+      width: 48,
+      height: 34,
       padding: const EdgeInsets.all(6),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey.shade300),
+        borderRadius: BorderRadius.circular(10),
       ),
       alignment: Alignment.center,
       child: Image.asset(asset, fit: BoxFit.contain),
@@ -174,24 +167,30 @@ class SaveMedFooter extends StatelessWidget {
     final content = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+        Text(
+          title,
+          style: const TextStyle(
+            fontWeight: FontWeight.w700,
+            color: Colors.white,
+          ),
+        ),
         const SizedBox(height: 12),
         ...items.map(
           (e) => Padding(
             padding: const EdgeInsets.only(bottom: 8),
             child: Text(
               e,
-              style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
+              style: TextStyle(
+                fontSize: 13,
+                color: Colors.white.withValues(alpha: 0.74),
+              ),
             ),
           ),
         ),
       ],
     );
 
-    if (!expanded) {
-      return content;
-    }
-
+    if (!expanded) return content;
     return Expanded(child: content);
   }
 }

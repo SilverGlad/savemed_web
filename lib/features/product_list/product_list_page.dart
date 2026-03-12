@@ -25,7 +25,8 @@ class _ProductListPageState extends State<ProductListPage> {
   void initState() {
     super.initState();
 
-    Future.microtask(() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       final controller = context.read<InventoryController>();
       controller.categoryId = widget.category.id;
       controller.subcategoryId = null;

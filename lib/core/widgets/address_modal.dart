@@ -174,6 +174,7 @@ class _AddressModalState extends State<AddressModal> {
                 child: SaveMedButton(
                   label: 'Salvar endereço',
                   onPressed: () async {
+                    final navigator = Navigator.of(context);
                     final data = {
                       'USER_ID': userId,
                       'CEP': cep.text,
@@ -193,7 +194,8 @@ class _AddressModalState extends State<AddressModal> {
                       await ctrl.update(widget.address!['ID'], data, userId);
                     }
 
-                    Navigator.pop(context);
+                    if (!mounted) return;
+                    navigator.pop();
                   },
                 ),
               ),

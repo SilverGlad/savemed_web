@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as context show read;
-import 'package:provider/provider.dart';
-import 'package:SaveMed/core/controllers/address_controller.dart'
-    show AddressController;
+import 'package:SaveMed/core/controllers/address_controller.dart';
+
 import '../services/auth_service.dart';
 import '../storage/token_storage.dart';
 
@@ -15,25 +13,19 @@ class AuthController extends ChangeNotifier {
 
   bool get isLogged => token != null;
 
-  // =====================
-  // INIT / RESTORE SESSION
-  // =====================
-  Future<void> restoreSession(BuildContext context) async {
+  Future<void> restoreSession(AddressController addressController) async {
     final savedToken = await TokenStorage.getToken();
 
-    print('Saved token: $savedToken');
+    debugPrint('Saved token: $savedToken');
 
     if (savedToken != null) {
       token = savedToken;
 
       try {
         user = await _service.me();
-
-        // 👇 CARREGA ENDEREÇOS AQUI
-        final addressCtrl = context.read<AddressController>();
-        await addressCtrl.load(user!['ID']);
+        await addressController.load(user!['ID']);
       } catch (e) {
-        print('Erro ao restaurar sessão: $e');
+        debugPrint('Erro ao restaurar sessao: $e');
         token = null;
         user = null;
         await TokenStorage.clear();
@@ -44,30 +36,22 @@ class AuthController extends ChangeNotifier {
     notifyListeners();
   }
 
-  // =====================
-  // LOGIN
-  // =====================
   Future<void> login(
     String email,
     String password,
-    BuildContext context,
+    AddressController addressController,
   ) async {
     final result = await _service.login(email: email, password: password);
 
     token = result['token'];
     user = result['user'];
 
-    final addressCtrl = context.read<AddressController>();
-    await addressCtrl.load(user!['ID']);
-
     await TokenStorage.saveToken(token!);
+    await addressController.load(user!['ID']);
 
     notifyListeners();
   }
 
-  // =====================
-  // REGISTRO
-  // =====================
   Future<void> register({
     required bool isCustomer,
     required String name,
@@ -95,9 +79,6 @@ class AuthController extends ChangeNotifier {
     }
   }
 
-  // =====================
-  // LOGOUT
-  // =====================
   Future<void> logout() async {
     token = null;
     user = null;

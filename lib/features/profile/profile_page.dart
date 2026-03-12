@@ -1,16 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:SaveMed/core/controllers/cart_controller.dart';
-import 'package:SaveMed/core/widgets/confirm_clear_cart_dialog.dart';
-import 'package:SaveMed/core/widgets/savemed_header.dart';
-import 'package:SaveMed/core/widgets/savemed_footer.dart';
-import 'package:SaveMed/features/cart/cart_page.dart';
 import 'package:SaveMed/core/controllers/address_controller.dart';
 import 'package:SaveMed/core/controllers/auth_controller.dart';
 import 'package:SaveMed/core/controllers/order_controller.dart';
 import 'package:SaveMed/core/theme/app_colors.dart';
 import 'package:SaveMed/core/widgets/address_modal.dart';
 import 'package:SaveMed/core/widgets/savemed_button.dart';
+import 'package:SaveMed/core/widgets/savemed_footer.dart';
+import 'package:SaveMed/core/widgets/savemed_header.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -30,14 +27,18 @@ class _ProfilePageState extends State<ProfilePage>
   }
 
   @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final user = context.watch<AuthController>().user;
-    final width = MediaQuery.of(context).size.width;
-    final isMobile = width <= 600;
 
     if (user == null) {
       return const Scaffold(
-        body: Center(child: Text('Usuário não autenticado')),
+        body: Center(child: Text('Usuario nao autenticado')),
       );
     }
 
@@ -46,7 +47,6 @@ class _ProfilePageState extends State<ProfilePage>
       body: Column(
         children: [
           SaveMedHeader(),
-
           Expanded(
             child: Column(
               children: [
@@ -59,12 +59,11 @@ class _ProfilePageState extends State<ProfilePage>
                     indicatorWeight: 3,
                     tabs: const [
                       Tab(text: 'Meus dados'),
-                      Tab(text: 'Endereços'),
+                      Tab(text: 'Enderecos'),
                       Tab(text: 'Pedidos'),
                     ],
                   ),
                 ),
-
                 Expanded(
                   child: TabBarView(
                     controller: _tabController,
@@ -78,17 +77,12 @@ class _ProfilePageState extends State<ProfilePage>
               ],
             ),
           ),
-
           const SaveMedFooter(),
         ],
       ),
     );
   }
 }
-
-/* =======================================================
- * PERFIL
- * ======================================================= */
 
 class _ProfileForm extends StatefulWidget {
   const _ProfileForm();
@@ -107,6 +101,13 @@ class _ProfileFormState extends State<_ProfileForm> {
     final user = context.read<AuthController>().user!;
     nameCtrl = TextEditingController(text: user['NAME']);
     phoneCtrl = TextEditingController(text: user['PHONE_NUMBER'] ?? '');
+  }
+
+  @override
+  void dispose() {
+    nameCtrl.dispose();
+    phoneCtrl.dispose();
+    super.dispose();
   }
 
   @override
@@ -137,7 +138,7 @@ class _ProfileFormState extends State<_ProfileForm> {
                       const SnackBar(content: Text('Dados atualizados')),
                     );
                   },
-                  label: 'Salvar alterações',
+                  label: 'Salvar alteracoes',
                 ),
               ),
             ],
@@ -193,10 +194,6 @@ class _ProfileFormState extends State<_ProfileForm> {
   }
 }
 
-/* =======================================================
- * ENDEREÇOS
- * ======================================================= */
-
 class _AddressSection extends StatefulWidget {
   const _AddressSection();
 
@@ -231,7 +228,7 @@ class _AddressSectionState extends State<_AddressSection> {
             alignment: Alignment.centerRight,
             child: FilledButton.icon(
               icon: const Icon(Icons.add_location_alt),
-              label: const Text('Adicionar novo endereço'),
+              label: const Text('Adicionar novo endereco'),
               style: FilledButton.styleFrom(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 20,
@@ -242,15 +239,13 @@ class _AddressSectionState extends State<_AddressSection> {
                 ),
               ),
               onPressed: () {
-                _openAddressModal(context, userId);
+                _openAddressModal(context, address: null);
               },
             ),
           ),
           const SizedBox(height: 16),
-          if (ctrl.addresses.isEmpty) const Text('Nenhum endereço cadastrado'),
-          ...ctrl.addresses.map((addr) {
-            return _addressCard(context, addr, userId);
-          }).toList(),
+          if (ctrl.addresses.isEmpty) const Text('Nenhum endereco cadastrado'),
+          ...ctrl.addresses.map((addr) => _addressCard(context, addr, userId)),
         ],
       ),
     );
@@ -270,7 +265,7 @@ class _AddressSectionState extends State<_AddressSection> {
             IconButton(
               icon: const Icon(Icons.edit),
               onPressed: () {
-                _openAddressModal(context, userId, address: addr);
+                _openAddressModal(context, address: addr);
               },
             ),
             IconButton(
@@ -288,17 +283,13 @@ class _AddressSectionState extends State<_AddressSection> {
     );
   }
 
-  void _openAddressModal(BuildContext context, int userId, {Map? address}) {
+  void _openAddressModal(BuildContext context, {Map? address}) {
     showDialog(
       context: context,
       builder: (_) => AddressModal(address: address),
     );
   }
 }
-
-/* =======================================================
- * PEDIDOS
- * ======================================================= */
 
 class _OrdersSection extends StatefulWidget {
   const _OrdersSection();
@@ -326,7 +317,7 @@ class _OrdersSectionState extends State<_OrdersSection> {
     }
 
     if (ctrl.orders.isEmpty) {
-      return const Center(child: Text('Você ainda não possui pedidos'));
+      return const Center(child: Text('Voce ainda nao possui pedidos'));
     }
 
     return ListView.separated(
@@ -334,16 +325,18 @@ class _OrdersSectionState extends State<_OrdersSection> {
       itemCount: ctrl.orders.length,
       separatorBuilder: (_, __) => const SizedBox(height: 12),
       itemBuilder: (_, index) {
-        final order = ctrl.orders[index];
-        return _orderCard(context, order);
+        final order = ctrl.orders[index] as Map<String, dynamic>;
+        return _orderCard(order);
       },
     );
   }
 
-  Widget _orderCard(BuildContext context, Map order) {
-    final status = order['STATUS'];
+  Widget _orderCard(Map<String, dynamic> order) {
+    final orderStatus = (order['STATUS'] ?? 'pending').toString();
+    final paymentStatus = (order['PAYMENT_STATUS'] ?? 'pending').toString();
     final total = order['TOTAL_AMOUNT'];
     final createdAt = DateTime.parse(order['CREATED_AT']);
+    final pharmacyName = order['pharmacy']?['NAME'] ?? 'Farmacia';
 
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -352,14 +345,16 @@ class _OrdersSectionState extends State<_OrdersSection> {
           'Pedido #${order['ID']}',
           style: const TextStyle(fontWeight: FontWeight.w600),
         ),
-        subtitle: Text('Total: R\$ $total • ${_formatDate(createdAt)}'),
-        trailing: _statusChip(status),
+        subtitle: Text(
+          '$pharmacyName • Total: R\$ $total • ${_formatDate(createdAt)}',
+        ),
+        trailing: _statusSummary(orderStatus, paymentStatus),
         children: [const Divider(), ..._orderItems(order)],
       ),
     );
   }
 
-  List<Widget> _orderItems(Map order) {
+  List<Widget> _orderItems(Map<String, dynamic> order) {
     final items = order['items'] as List? ?? [];
 
     if (items.isEmpty) {
@@ -372,9 +367,11 @@ class _OrdersSectionState extends State<_OrdersSection> {
     }
 
     return items.map<Widget>((item) {
-      final medName = item['medication']?['NAME'] ?? 'Produto';
-      final qty = item['QUANTITY'];
-      final total = item['TOTAL_PRICE'];
+      final orderItem = item as Map<String, dynamic>;
+      final medName =
+          orderItem['inventory']?['medication']?['NAME'] ?? 'Produto';
+      final qty = orderItem['QUANTITY'];
+      final total = orderItem['TOTAL_PRICE'];
 
       return ListTile(
         title: Text(medName),
@@ -384,14 +381,33 @@ class _OrdersSectionState extends State<_OrdersSection> {
     }).toList();
   }
 
-  Widget _statusChip(String status) {
+  Widget _statusSummary(String orderStatus, String paymentStatus) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        _orderStatusChip(orderStatus),
+        const SizedBox(height: 4),
+        Text(
+          _paymentLabel(paymentStatus),
+          style: TextStyle(
+            fontSize: 12,
+            color: _paymentColor(paymentStatus),
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _orderStatusChip(String status) {
     Color color;
     String label;
 
     switch (status) {
-      case 'completed':
+      case 'confirmed':
         color = Colors.green;
-        label = 'Concluído';
+        label = 'Confirmado';
         break;
       case 'canceled':
         color = Colors.red;
@@ -404,9 +420,35 @@ class _OrdersSectionState extends State<_OrdersSection> {
 
     return Chip(
       label: Text(label),
-      backgroundColor: color.withOpacity(0.15),
+      backgroundColor: color.withValues(alpha: 0.15),
       labelStyle: TextStyle(color: color),
     );
+  }
+
+  String _paymentLabel(String status) {
+    switch (status) {
+      case 'paid':
+        return 'Pagamento aprovado';
+      case 'failed':
+        return 'Pagamento falhou';
+      case 'refunded':
+        return 'Pagamento estornado';
+      default:
+        return 'Pagamento pendente';
+    }
+  }
+
+  Color _paymentColor(String status) {
+    switch (status) {
+      case 'paid':
+        return Colors.green;
+      case 'failed':
+        return Colors.red;
+      case 'refunded':
+        return Colors.blueGrey;
+      default:
+        return Colors.orange;
+    }
   }
 
   String _formatDate(DateTime date) {

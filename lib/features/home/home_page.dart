@@ -7,105 +7,148 @@ import '../../core/widgets/banner_carousel.dart';
 import '../../core/widgets/category_section.dart';
 import '../../core/widgets/savemed_header.dart';
 import '../../core/widgets/inventory_section.dart';
+import '../../core/theme/app_colors.dart';
 
-class HomePage extends StatelessWidget {
+class HomePage extends StatefulWidget {
   const HomePage({super.key});
+
+  @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      context.read<HomeInventoryController>().load();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
     final isMobile = width <= 600;
 
-    return ChangeNotifierProvider(
-      create: (_) => HomeInventoryController()..load(),
-      child: Scaffold(
-        backgroundColor: const Color(0xFFF4F5F7),
-        body: CustomScrollView(
-          slivers: [
-            // =====================
-            // HEADER
-            // =====================
-            SliverToBoxAdapter(child: SaveMedHeader()),
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      body: CustomScrollView(
+        slivers: [
+          const SliverToBoxAdapter(child: SaveMedHeader()),
 
-            // =====================
-            // BANNER
-            // =====================
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: EdgeInsets.symmetric(
-                  horizontal: isMobile ? 12 : 0,
-                  vertical: isMobile ? 8 : 0,
-                ),
-                child: const BannerCarousel(),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(
+                isMobile ? 12 : 24,
+                0,
+                isMobile ? 12 : 24,
+                18,
               ),
-            ),
-
-            // =====================
-            // CATEGORIAS
-            // =====================
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: isMobile ? 12 : 0),
-                child: const CategorySection(),
-              ),
-            ),
-
-            // =====================
-            // OFERTAS
-            // =====================
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: isMobile ? 12 : 0),
-                child: Consumer<HomeInventoryController>(
-                  builder: (_, ctrl, __) => InventorySection(
-                    title: 'Ofertas em destaque',
-                    items: ctrl.highlights,
+              child: Container(
+                padding: EdgeInsets.all(isMobile ? 20 : 28),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [AppColors.primaryDark, AppColors.primary],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                   ),
+                  borderRadius: BorderRadius.circular(30),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.accent,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: const Text(
+                        'App com foco mobile',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textDark,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    Text(
+                      'Sua farmácia digital com navegação mais leve e direta.',
+                      style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                        color: Colors.white,
+                        fontSize: isMobile ? 28 : 34,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      'Busque, compare e finalize pedidos com uma interface pensada primeiro para o celular.',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.88),
+                        height: 1.4,
+                        fontSize: isMobile ? 14 : 15,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
+          ),
 
-            // =====================
-            // MEDICAMENTOS
-            // =====================
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: isMobile ? 12 : 0),
-                child: Consumer<HomeInventoryController>(
-                  builder: (_, ctrl, __) => InventorySection(
-                    title: 'Medicamentos',
-                    items: ctrl.products,
-                  ),
-                ),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: EdgeInsets.symmetric(
+                horizontal: isMobile ? 0 : 0,
+                vertical: isMobile ? 0 : 0,
+              ),
+              child: const BannerCarousel(),
+            ),
+          ),
+
+          const SliverToBoxAdapter(child: CategorySection()),
+
+          SliverToBoxAdapter(
+            child: Consumer<HomeInventoryController>(
+              builder: (_, ctrl, __) => InventorySection(
+                title: 'Ofertas em destaque',
+                items: ctrl.highlights,
               ),
             ),
+          ),
 
-            // =====================
-            // MAIS VENDIDOS
-            // =====================
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: isMobile ? 12 : 0),
-                child: Consumer<HomeInventoryController>(
-                  builder: (_, ctrl, __) => InventorySection(
-                    title: 'Mais vendidos',
-                    items: ctrl.bestSellers,
-                  ),
-                ),
+          SliverToBoxAdapter(
+            child: Consumer<HomeInventoryController>(
+              builder: (_, ctrl, __) => InventorySection(
+                title: 'Medicamentos',
+                items: ctrl.products,
               ),
             ),
+          ),
 
-            // =====================
-            // FOOTER
-            // =====================
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: EdgeInsets.only(top: isMobile ? 24 : 40),
-                child: const SaveMedFooter(),
+          SliverToBoxAdapter(
+            child: Consumer<HomeInventoryController>(
+              builder: (_, ctrl, __) => InventorySection(
+                title: 'Mais vendidos',
+                items: ctrl.bestSellers,
               ),
             ),
-          ],
-        ),
+          ),
+
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(
+                isMobile ? 12 : 24,
+                10,
+                isMobile ? 12 : 24,
+                isMobile ? 20 : 30,
+              ),
+              child: const SaveMedFooter(),
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -22,10 +22,11 @@ class SaveMedButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDisabled = onPressed == null || loading;
+    final theme = Theme.of(context);
 
     final backgroundColor = outlined
         ? Colors.transparent
-        : (isDisabled ? Colors.green.shade200 : AppColors.primary);
+        : (isDisabled ? AppColors.primary.withValues(alpha: 0.45) : AppColors.primary);
 
     final foregroundColor = outlined ? AppColors.primary : Colors.white;
 
@@ -35,16 +36,18 @@ class SaveMedButton extends StatelessWidget {
       child: ElevatedButton(
         onPressed: isDisabled ? null : onPressed,
         style: ElevatedButton.styleFrom(
-          elevation: 0,
+          elevation: outlined ? 0 : 1,
+          shadowColor: AppColors.primary.withValues(alpha: 0.24),
           backgroundColor: backgroundColor,
           foregroundColor: foregroundColor,
+          padding: const EdgeInsets.symmetric(horizontal: 18),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(18),
             side: outlined
-                ? BorderSide(color: AppColors.primary)
+                ? const BorderSide(color: AppColors.primary)
                 : BorderSide.none,
           ),
-          textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+          textStyle: theme.textTheme.titleMedium,
         ),
         child: loading
             ? const SizedBox(

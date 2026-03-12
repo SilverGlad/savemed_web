@@ -55,17 +55,15 @@ class InventoryController extends ChangeNotifier {
       final med = item.medication;
 
       if (categoryId != null && med.categoryId != categoryId) return false;
-      if (subcategoryId != null && med.subcategoryId != subcategoryId)
+      if (subcategoryId != null && med.subcategoryId != subcategoryId) {
         return false;
+      }
       if (onlyAvailable && item.stock <= 0) return false;
       if (onlyHighlight && item.originalPrice <= item.price) return false;
 
       // 🔎 BUSCA TEXTUAL
       if (search.isNotEmpty) {
-        final text =
-            ('${med.name} '
-                    '${med.description ?? ''} ')
-                .toLowerCase();
+        final text = ('${med.name} ${med.description} ').toLowerCase();
 
         if (!text.contains(search)) return false;
       }

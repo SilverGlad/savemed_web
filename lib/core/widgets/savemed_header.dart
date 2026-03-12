@@ -6,12 +6,13 @@ import 'package:SaveMed/core/controllers/cart_controller.dart';
 import 'package:SaveMed/core/controllers/search_controller.dart';
 import 'package:SaveMed/core/theme/app_colors.dart';
 
+import 'package:SaveMed/features/admin/admin_page.dart';
 import 'package:SaveMed/features/auth/auth_page.dart';
 import 'package:SaveMed/features/cart/cart_page.dart';
 import 'package:SaveMed/features/profile/profile_page.dart';
 
 class SaveMedHeader extends StatefulWidget {
-  SaveMedHeader({super.key});
+  const SaveMedHeader({super.key});
 
   @override
   State<SaveMedHeader> createState() => _SaveMedHeaderState();
@@ -25,9 +26,9 @@ class _SaveMedHeaderState extends State<SaveMedHeader> {
 
     _overlay = OverlayEntry(
       builder: (context) => Positioned(
-        top: 60, // abaixo do header
-        left: 24,
-        right: 24,
+        top: 86,
+        left: 16,
+        right: 16,
         child: const _SearchOverlay(),
       ),
     );
@@ -49,126 +50,203 @@ class _SaveMedHeaderState extends State<SaveMedHeader> {
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthController>();
+    final isMobile = MediaQuery.of(context).size.width <= 760;
 
     return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-      child: Row(
-        children: [
-          // =====================
-          // LOGO
-          // =====================
-          InkWell(
-            borderRadius: BorderRadius.circular(8),
-            onTap: () {
-              Navigator.popUntil(context, (route) => route.isFirst);
-            },
-            child: Row(
-              children: [
-                Image.asset('assets/images/logo.png', height: 36),
-                const SizedBox(width: 8),
-                Text(
-                  'SaveMed',
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.primary,
-                  ),
-                ),
-              ],
-            ),
+      margin: EdgeInsets.fromLTRB(isMobile ? 12 : 24, 12, isMobile ? 12 : 24, 12),
+      padding: EdgeInsets.fromLTRB(isMobile ? 16 : 22, 14, isMobile ? 16 : 22, 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: AppColors.border),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primaryDark.withValues(alpha: 0.06),
+            blurRadius: 18,
+            offset: const Offset(0, 10),
           ),
-
-          const SizedBox(width: 32),
-
-          // =====================
-          // BUSCA
-          // =====================
-          Expanded(
-            child: Consumer<SearchController>(
-              builder: (context, search, _) {
-                // controla overlay
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  if (search.query.isNotEmpty && search.products.isNotEmpty) {
-                    _showOverlay();
-                  } else {
-                    _hideOverlay();
-                  }
-                });
-
-                return TextField(
-                  onChanged: search.search,
-                  decoration: InputDecoration(
-                    hintText: 'Busque um produto...',
-                    prefixIcon: const Icon(Icons.search),
-                    suffixIcon: search.query.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.close),
-                            onPressed: () {
-                              search.clear();
-                              _hideOverlay();
-                            },
-                          )
-                        : null,
-                    filled: true,
-                    fillColor: AppColors.background,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none,
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-
-          const SizedBox(width: 16),
-
-          // =====================
-          // CARRINHO
-          // =====================
-          Consumer<CartController>(
-            builder: (context, cart, _) {
-              final count = cart.totalItems;
-
-              return InkWell(
-                borderRadius: BorderRadius.circular(24),
-                onTap: () {
-                  _hideOverlay();
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const CartPage()),
-                  );
-                },
-                child: Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    const Padding(
-                      padding: EdgeInsets.all(8),
-                      child: Icon(Icons.shopping_cart_outlined, size: 26),
-                    ),
-                    if (count > 0)
-                      Positioned(
-                        top: -2,
-                        right: -2,
-                        child: _CartBadge(count: count),
-                      ),
-                  ],
-                ),
-              );
-            },
-          ),
-
-          const SizedBox(width: 8),
-
-          // =====================
-          // PERFIL / LOGIN
-          // =====================
-          auth.isLogged
-              ? _UserMenu(userName: auth.user!['NAME'])
-              : _LoginButton(),
         ],
       ),
+      child: isMobile
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _topRow(context, auth),
+                const SizedBox(height: 14),
+                _searchField(),
+                const SizedBox(height: 12),
+                _mobileActions(context, auth),
+              ],
+            )
+          : Row(
+              children: [
+                _brand(context),
+                const SizedBox(width: 24),
+                Expanded(child: _searchField()),
+                const SizedBox(width: 16),
+                _desktopActions(context, auth),
+              ],
+            ),
+    );
+  }
+
+  Widget _topRow(BuildContext context, AuthController auth) {
+    return Row(
+      children: [
+        Expanded(child: _brand(context)),
+        const SizedBox(width: 10),
+        _cartAction(context),
+      ],
+    );
+  }
+
+  Widget _desktopActions(BuildContext context, AuthController auth) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _cartAction(context),
+        const SizedBox(width: 12),
+        auth.isLogged ? _UserMenu(userName: auth.user!['NAME']) : const _LoginButton(),
+      ],
+    );
+  }
+
+  Widget _mobileActions(BuildContext context, AuthController auth) {
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            auth.isLogged
+                ? 'Ola, ${auth.user!['NAME'].toString().split(' ').first}'
+                : 'Acesse sua conta para continuar',
+            style: const TextStyle(
+              color: AppColors.textLight,
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+        auth.isLogged ? _UserMenu(userName: auth.user!['NAME']) : const _LoginButton(compact: true),
+      ],
+    );
+  }
+
+  Widget _brand(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(12),
+      onTap: () {
+        Navigator.popUntil(context, (route) => route.isFirst);
+      },
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [AppColors.primary, AppColors.primaryDark],
+              ),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(8),
+              child: Image.asset('assets/images/logo.png'),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'SaveMed',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textDark,
+                ),
+              ),
+              Text(
+                'cuidado rapido e bonito',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: AppColors.textLight.withValues(alpha: 0.9),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _searchField() {
+    return Consumer<SearchController>(
+      builder: (context, search, _) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (search.query.isNotEmpty && search.products.isNotEmpty) {
+            _showOverlay();
+          } else {
+            _hideOverlay();
+          }
+        });
+
+        return TextField(
+          onChanged: search.search,
+          decoration: InputDecoration(
+            hintText: 'Busque medicamentos, higiene e beleza',
+            prefixIcon: const Icon(Icons.search_rounded),
+            suffixIcon: search.query.isNotEmpty
+                ? IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () {
+                      search.clear();
+                      _hideOverlay();
+                    },
+                  )
+                : null,
+            fillColor: AppColors.background,
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _cartAction(BuildContext context) {
+    return Consumer<CartController>(
+      builder: (context, cart, _) {
+        final count = cart.totalItems;
+
+        return InkWell(
+          borderRadius: BorderRadius.circular(20),
+          onTap: () {
+            _hideOverlay();
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const CartPage()),
+            );
+          },
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceMuted,
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: const Icon(Icons.shopping_bag_outlined, size: 22),
+              ),
+              if (count > 0)
+                Positioned(
+                  top: -4,
+                  right: -4,
+                  child: _CartBadge(count: count),
+                ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
@@ -181,17 +259,31 @@ class _SearchOverlay extends StatelessWidget {
     return Consumer<SearchController>(
       builder: (context, search, _) {
         return Material(
-          elevation: 12,
-          borderRadius: BorderRadius.circular(12),
+          color: Colors.transparent,
           child: Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: AppColors.border),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.primaryDark.withValues(alpha: 0.1),
+                  blurRadius: 22,
+                  offset: const Offset(0, 12),
+                ),
+              ],
+            ),
             constraints: const BoxConstraints(maxHeight: 320),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  'PRODUTOS',
-                  style: TextStyle(fontWeight: FontWeight.bold),
+                  'Resultados rapidos',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textDark,
+                  ),
                 ),
                 const SizedBox(height: 8),
                 Expanded(
@@ -200,44 +292,36 @@ class _SearchOverlay extends StatelessWidget {
                       final image = item.medication.image;
 
                       return ListTile(
-                        dense: true,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 4),
                         leading: image != null && image.isNotEmpty
-                            ? Image.network(
-                                image,
-                                width: 40,
-                                height: 40,
-                                fit: BoxFit.cover,
+                            ? ClipRRect(
+                                borderRadius: BorderRadius.circular(10),
+                                child: Image.network(
+                                  image,
+                                  width: 42,
+                                  height: 42,
+                                  fit: BoxFit.cover,
+                                ),
                               )
                             : Container(
-                                width: 40,
-                                height: 40,
+                                width: 42,
+                                height: 42,
                                 decoration: BoxDecoration(
-                                  color: Colors.grey.shade200,
-                                  borderRadius: BorderRadius.circular(6),
+                                  color: AppColors.surfaceMuted,
+                                  borderRadius: BorderRadius.circular(10),
                                 ),
-                                child: const Icon(
-                                  Icons.medication_outlined,
-                                  size: 20,
-                                  color: Colors.grey,
-                                ),
+                                child: const Icon(Icons.medication_outlined),
                               ),
-                        title: Text(item.medication.name),
-                        onTap: () {
-                          // TODO: abrir página do produto
-                        },
+                        title: Text(
+                          item.medication.name,
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                        subtitle: Text(
+                          'R\$ ${item.price.toStringAsFixed(2).replaceAll('.', ',')}',
+                        ),
+                        onTap: () {},
                       );
                     }).toList(),
-                  ),
-                ),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: TextButton(
-                    onPressed: () {
-                      // TODO: navegar para listagem completa
-                    },
-                    child: Text(
-                      'VER TODOS OS PRODUTOS (${search.products.length})',
-                    ),
                   ),
                 ),
               ],
@@ -258,16 +342,17 @@ class _CartBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
-        color: Colors.red,
-        borderRadius: BorderRadius.circular(12),
+        color: AppColors.danger,
+        borderRadius: BorderRadius.circular(999),
       ),
       constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
       child: Text(
         count > 99 ? '99+' : count.toString(),
+        textAlign: TextAlign.center,
         style: const TextStyle(
           color: Colors.white,
           fontSize: 11,
-          fontWeight: FontWeight.bold,
+          fontWeight: FontWeight.w700,
         ),
       ),
     );
@@ -275,10 +360,14 @@ class _CartBadge extends StatelessWidget {
 }
 
 class _LoginButton extends StatelessWidget {
+  final bool compact;
+
+  const _LoginButton({this.compact = false});
+
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      borderRadius: BorderRadius.circular(24),
+      borderRadius: BorderRadius.circular(999),
       onTap: () {
         Navigator.push(
           context,
@@ -286,25 +375,30 @@ class _LoginButton extends StatelessWidget {
         );
       },
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        padding: EdgeInsets.symmetric(
+          horizontal: compact ? 14 : 18,
+          vertical: compact ? 10 : 12,
+        ),
         decoration: BoxDecoration(
-          color: AppColors.primary.withOpacity(0.08),
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: AppColors.primary.withOpacity(0.25)),
+          color: AppColors.primary.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: AppColors.primary.withValues(alpha: 0.14)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.person_outline, size: 20, color: AppColors.primary),
-            const SizedBox(width: 8),
-            Text(
-              'Entrar',
-              style: TextStyle(
-                color: AppColors.primary,
-                fontWeight: FontWeight.w600,
-                fontSize: 14,
+            Icon(Icons.person_outline, size: 18, color: AppColors.primary),
+            if (!compact) ...[
+              const SizedBox(width: 8),
+              const Text(
+                'Entrar',
+                style: TextStyle(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14,
+                ),
               ),
-            ),
+            ],
           ],
         ),
       ),
@@ -318,9 +412,19 @@ class _UserMenu extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final role = context.watch<AuthController>().user?['USER_ROLE'];
+    final canAccessAdmin = role == 'app_admin' || role == 'pharmacy_admin';
+
     return PopupMenuButton<String>(
       offset: const Offset(0, 42),
       onSelected: (value) {
+        if (value == 'admin') {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const AdminPage()),
+          );
+        }
+
         if (value == 'profile') {
           Navigator.push(
             context,
@@ -338,8 +442,19 @@ class _UserMenu extends StatelessWidget {
           );
         }
       },
-      itemBuilder: (context) => const [
-        PopupMenuItem(
+      itemBuilder: (context) => [
+        if (canAccessAdmin)
+          const PopupMenuItem(
+            value: 'admin',
+            child: Row(
+              children: [
+                Icon(Icons.admin_panel_settings_outlined, size: 18),
+                SizedBox(width: 8),
+                Text('Administracao'),
+              ],
+            ),
+          ),
+        const PopupMenuItem(
           value: 'profile',
           child: Row(
             children: [
@@ -349,8 +464,8 @@ class _UserMenu extends StatelessWidget {
             ],
           ),
         ),
-        PopupMenuDivider(),
-        PopupMenuItem(
+        const PopupMenuDivider(),
+        const PopupMenuItem(
           value: 'logout',
           child: Row(
             children: [
@@ -361,27 +476,35 @@ class _UserMenu extends StatelessWidget {
           ),
         ),
       ],
-      child: Row(
-        children: [
-          CircleAvatar(
-            radius: 16,
-            backgroundColor: AppColors.primary.withOpacity(0.15),
-            child: Text(
-              userName.substring(0, 1).toUpperCase(),
-              style: TextStyle(
-                color: AppColors.primary,
-                fontWeight: FontWeight.bold,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceMuted,
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircleAvatar(
+              radius: 15,
+              backgroundColor: AppColors.primary.withValues(alpha: 0.16),
+              child: Text(
+                userName.substring(0, 1).toUpperCase(),
+                style: const TextStyle(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            userName.split(' ').first,
-            style: const TextStyle(fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(width: 4),
-          const Icon(Icons.expand_more, size: 18),
-        ],
+            const SizedBox(width: 8),
+            Text(
+              userName.split(' ').first,
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(width: 2),
+            const Icon(Icons.expand_more, size: 18),
+          ],
+        ),
       ),
     );
   }

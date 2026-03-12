@@ -30,10 +30,7 @@ class SearchController extends ChangeNotifier {
     products = allItems.where((item) {
       final med = item.medication;
 
-      final text =
-          ('${med.name} '
-                  '${med.description ?? ''} ')
-              .toLowerCase();
+      final text = ('${med.name} ${med.description} ').toLowerCase();
 
       return text.contains(q);
     }).toList();

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:SaveMed/core/controllers/cart_controller.dart';
+import 'package:SaveMed/core/theme/app_colors.dart';
 import 'package:SaveMed/core/widgets/confirm_clear_cart_dialog.dart';
 import 'package:SaveMed/features/product_detail/product_detail_page.dart';
 import 'package:SaveMed/models/inventory_item.dart';
@@ -45,24 +46,25 @@ class _InventoryCardState extends State<InventoryCard> {
           duration: const Duration(milliseconds: 200),
           curve: Curves.easeOut,
           transform: _hovered
-              ? (Matrix4.identity()..translate(0.0, -4.0))
+              ? (Matrix4.identity()..translateByDouble(0.0, -4.0, 0.0, 1.0))
               : Matrix4.identity(),
-          width: 220,
-          height: 320,
+          width: MediaQuery.of(context).size.width <= 700 ? 188 : 220,
+          height: MediaQuery.of(context).size.width <= 700 ? 290 : 320,
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: AppColors.border),
             boxShadow: _hovered
                 ? [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.12),
+                      color: Colors.black.withValues(alpha: 0.12),
                       blurRadius: 20,
                       offset: const Offset(0, 8),
                     ),
                   ]
                 : [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
+                      color: Colors.black.withValues(alpha: 0.05),
                       blurRadius: 8,
                       offset: const Offset(0, 4),
                     ),
@@ -72,16 +74,18 @@ class _InventoryCardState extends State<InventoryCard> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // BADGE
-              if (widget.item.discount != null && widget.item.discount! > 0)
-                _badge('${widget.item.discount!.toInt()}% OFF'),
+              if (widget.item.discount > 0) _badge('${widget.item.discount}% OFF'),
 
-              const Spacer(),
-
+              const SizedBox(height: 8),
               Center(
-                child: SizedBox(
-                  height: 80,
-                  child: med.image != null && med.image!.isNotEmpty
+                child: Container(
+                  height: 112,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: AppColors.background,
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                  child: (med.image?.isNotEmpty ?? false)
                       ? Image.network(
                           med.image!,
                           fit: BoxFit.contain,
@@ -91,17 +95,30 @@ class _InventoryCardState extends State<InventoryCard> {
                       : const Icon(Icons.medical_services, size: 64),
                 ),
               ),
-
-              const Spacer(),
+              const SizedBox(height: 16),
 
               Text(
                 med.name,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontWeight: FontWeight.w600),
+                style: const TextStyle(
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textDark,
+                ),
               ),
 
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
+              Text(
+                med.description,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 12,
+                  height: 1.35,
+                  color: AppColors.textLight,
+                ),
+              ),
+              const Spacer(),
 
               Text(
                 _currencyFormatter.format(widget.item.price),
@@ -111,7 +128,7 @@ class _InventoryCardState extends State<InventoryCard> {
                 ),
               ),
 
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
 
               // =====================
               // BOTÃO ADD AO CARRINHO
@@ -120,6 +137,7 @@ class _InventoryCardState extends State<InventoryCard> {
                 onTap: available
                     ? () async {
                         final cart = context.read<CartController>();
+                        final messenger = ScaffoldMessenger.of(context);
 
                         if (!cart.canAddItem(widget.item)) {
                           final confirm = await showConfirmClearCartDialog(
@@ -130,9 +148,10 @@ class _InventoryCardState extends State<InventoryCard> {
                           cart.clear();
                         }
 
+                        if (!mounted) return;
                         cart.addItem(widget.item);
 
-                        ScaffoldMessenger.of(context).showSnackBar(
+                        messenger.showSnackBar(
                           const SnackBar(
                             content: Text('Produto adicionado ao carrinho'),
                             duration: Duration(seconds: 2),
@@ -152,7 +171,7 @@ class _InventoryCardState extends State<InventoryCard> {
                       color: available
                           ? Theme.of(context).primaryColor
                           : Colors.grey.shade400,
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(16),
                     ),
                     alignment: Alignment.center,
                     child: Text(
@@ -176,12 +195,16 @@ class _InventoryCardState extends State<InventoryCard> {
   Widget _badge(String text) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
     decoration: BoxDecoration(
-      color: Colors.orange,
-      borderRadius: BorderRadius.circular(12),
+      color: AppColors.accent,
+      borderRadius: BorderRadius.circular(999),
     ),
     child: Text(
       text,
-      style: const TextStyle(color: Colors.white, fontSize: 12),
+      style: const TextStyle(
+        color: AppColors.textDark,
+        fontSize: 11,
+        fontWeight: FontWeight.w700,
+      ),
     ),
   );
 }
