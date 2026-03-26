@@ -33,6 +33,17 @@ class AuthService {
     return jsonDecode(response.body);
   }
 
+  Future<List<dynamic>> listPharmacies() async {
+    final response = await ApiClient.get('/pharmacies');
+
+    if (response.statusCode != 200) {
+      final data = jsonDecode(response.body);
+      throw Exception(data['error'] ?? 'Erro ao buscar farmacias');
+    }
+
+    return jsonDecode(response.body) as List<dynamic>;
+  }
+
   // =====================
   // REGISTRO - CLIENTE
   // =====================
@@ -69,19 +80,69 @@ class AuthService {
     required String password,
     required String cnpj,
     required String phone,
+    required String pharmacyName,
+    required String city,
+    required String state,
+    required String zipcode,
   }) async {
+    final pharmacyResponse = await ApiClient.post('/pharmacies', {
+      'NAME': pharmacyName,
+      'CNPJ': cnpj.replaceAll(RegExp(r'\D'), ''),
+      'PHONE': phone.replaceAll(RegExp(r'\D'), ''),
+      'CITY': city.trim(),
+      'STATE': state.trim(),
+      'ZIPCODE': zipcode.replaceAll(RegExp(r'\D'), ''),
+    });
+
+    if (pharmacyResponse.statusCode != 201) {
+      final data = jsonDecode(pharmacyResponse.body);
+      throw Exception(data['error'] ?? 'Erro ao criar farmacia');
+    }
+
+    final pharmacyData =
+        jsonDecode(pharmacyResponse.body) as Map<String, dynamic>;
+    final pharmacyId = pharmacyData['ID'];
+
     final response = await ApiClient.post('/users/register', {
       'NAME': name,
       'EMAIL': email,
       'PASSWORD': password,
       'USER_ROLE': 'pharmacy_admin',
-      'CPF': cnpj.replaceAll(RegExp(r'\D'), ''),
+      'PHARMACY_ID': pharmacyId,
       'PHONE_NUMBER': phone.replaceAll(RegExp(r'\D'), ''),
     });
 
     if (response.statusCode != 201) {
       final data = jsonDecode(response.body);
       throw Exception(data['error'] ?? 'Erro ao criar conta');
+    }
+
+    return jsonDecode(response.body);
+  }
+
+  Future<Map<String, dynamic>> requestExistingPharmacyAccess({
+    required String name,
+    required String email,
+    required String password,
+    required String cnpj,
+    required String phone,
+    required int pharmacyId,
+    String? requestMessage,
+  }) async {
+    final response =
+        await ApiClient.post('/users/register/pharmacy-access-request', {
+          'NAME': name,
+          'EMAIL': email,
+          'PASSWORD': password,
+          'PHARMACY_ID': pharmacyId,
+          'CPF': cnpj.replaceAll(RegExp(r'\D'), ''),
+          'PHONE_NUMBER': phone.replaceAll(RegExp(r'\D'), ''),
+          'REQUEST_MESSAGE': requestMessage?.trim(),
+        });
+
+    if (response.statusCode != 201) {
+      final data = jsonDecode(response.body);
+      throw Exception(data['error'] ?? 'Erro ao solicitar acesso');
     }
 
     return jsonDecode(response.body);

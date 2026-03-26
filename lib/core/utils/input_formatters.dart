@@ -16,6 +16,11 @@ final phoneFormatter = MaskTextInputFormatter(
   filter: {"#": RegExp(r'[0-9]')},
 );
 
+final cepFormatter = MaskTextInputFormatter(
+  mask: '#####-###',
+  filter: {"#": RegExp(r'[0-9]')},
+);
+
 double toDouble(dynamic value) {
   if (value == null) return 0.0;
   if (value is num) return value.toDouble();

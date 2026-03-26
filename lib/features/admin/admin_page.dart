@@ -18,6 +18,7 @@ class AdminPage extends StatelessWidget {
 
     final tabs = <Tab>[
       if (isAppAdmin) const Tab(text: 'Farmacias'),
+      const Tab(text: 'Solicitacoes'),
       const Tab(text: 'Categorias'),
       const Tab(text: 'Medicamentos'),
       const Tab(text: 'Inventario'),
@@ -26,6 +27,7 @@ class AdminPage extends StatelessWidget {
 
     final views = <Widget>[
       if (isAppAdmin) const _PharmaciesTab(),
+      _AccessRequestsTab(pharmacyId: isAppAdmin ? null : pharmacyId),
       _CategoriesTab(pharmacyId: isAppAdmin ? null : pharmacyId),
       _MedicationsTab(pharmacyId: isAppAdmin ? null : pharmacyId),
       _InventoryTab(pharmacyId: isAppAdmin ? null : pharmacyId),
@@ -110,7 +112,10 @@ class _AdminHero extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.white.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(999),
@@ -235,9 +240,9 @@ abstract class _AdminListState<T extends StatefulWidget> extends State<T> {
     } catch (e) {
       if (!mounted) return;
       setState(() => error = e.toString());
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString())),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.toString())));
     }
   }
 
@@ -286,7 +291,10 @@ abstract class _AdminListState<T extends StatefulWidget> extends State<T> {
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(18),
                   ),
-                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 18,
+                    vertical: 16,
+                  ),
                 ),
                 icon: const Icon(Icons.add),
                 label: Text(createLabel),
@@ -394,11 +402,21 @@ class _PharmaciesTabState extends _AdminListState<_PharmaciesTab> {
   }
 
   Future<void> _showPharmacyDialog({Map<String, dynamic>? pharmacy}) async {
-    final name = TextEditingController(text: pharmacy?['NAME']?.toString() ?? '');
-    final phone = TextEditingController(text: pharmacy?['PHONE']?.toString() ?? '');
-    final city = TextEditingController(text: pharmacy?['CITY']?.toString() ?? '');
-    final stateCtrl = TextEditingController(text: pharmacy?['STATE']?.toString() ?? '');
-    final zip = TextEditingController(text: pharmacy?['ZIPCODE']?.toString() ?? '');
+    final name = TextEditingController(
+      text: pharmacy?['NAME']?.toString() ?? '',
+    );
+    final phone = TextEditingController(
+      text: pharmacy?['PHONE']?.toString() ?? '',
+    );
+    final city = TextEditingController(
+      text: pharmacy?['CITY']?.toString() ?? '',
+    );
+    final stateCtrl = TextEditingController(
+      text: pharmacy?['STATE']?.toString() ?? '',
+    );
+    final zip = TextEditingController(
+      text: pharmacy?['ZIPCODE']?.toString() ?? '',
+    );
 
     await showDialog<void>(
       context: context,
@@ -425,16 +443,13 @@ class _PharmaciesTabState extends _AdminListState<_PharmaciesTab> {
             onPressed: () async {
               Navigator.pop(dialogContext);
               await handle(
-                () => service.savePharmacy(
-                  {
-                    'NAME': name.text,
-                    'PHONE': phone.text,
-                    'CITY': city.text,
-                    'STATE': stateCtrl.text,
-                    'ZIPCODE': zip.text,
-                  },
-                  id: pharmacy?['ID'] as int?,
-                ),
+                () => service.savePharmacy({
+                  'NAME': name.text,
+                  'PHONE': phone.text,
+                  'CITY': city.text,
+                  'STATE': stateCtrl.text,
+                  'ZIPCODE': zip.text,
+                }, id: pharmacy?['ID'] as int?),
               );
             },
             child: const Text('Salvar'),
@@ -452,6 +467,127 @@ class _CategoriesTab extends StatefulWidget {
 
   @override
   State<_CategoriesTab> createState() => _CategoriesTabState();
+}
+
+class _AccessRequestsTab extends StatefulWidget {
+  final int? pharmacyId;
+
+  const _AccessRequestsTab({required this.pharmacyId});
+
+  @override
+  State<_AccessRequestsTab> createState() => _AccessRequestsTabState();
+}
+
+class _AccessRequestsTabState extends _AdminListState<_AccessRequestsTab> {
+  @override
+  void initState() {
+    super.initState();
+    reload();
+  }
+
+  @override
+  Future<void> reload() async {
+    setState(() => loading = true);
+    try {
+      items = await service.listAccessRequests(pharmacyId: widget.pharmacyId);
+    } catch (e) {
+      error = e.toString();
+    }
+    if (!mounted) return;
+    setState(() => loading = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return buildScaffold(
+      title: 'Solicitacoes de acesso',
+      description:
+          'Aprove ou rejeite pessoas que pediram acesso a uma farmacia ja cadastrada.',
+      onCreate: () => reload(),
+      createLabel: 'Atualizar',
+      child: items.isEmpty
+          ? const Center(
+              child: Text(
+                'Nenhuma solicitacao encontrada.',
+                style: TextStyle(color: AppColors.textLight),
+              ),
+            )
+          : ListView.separated(
+              itemCount: items.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 12),
+              itemBuilder: (_, index) {
+                final request = items[index] as Map<String, dynamic>;
+                final pharmacy = request['pharmacy'] as Map<String, dynamic>?;
+                final status = request['STATUS']?.toString() ?? 'pending';
+                final pending = status == 'pending';
+                return Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          request['NAME']?.toString() ?? 'Solicitante',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.textDark,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          '${request['EMAIL']} • ${pharmacy?['NAME'] ?? 'Farmacia'}',
+                          style: const TextStyle(color: AppColors.textLight),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Status: $status',
+                          style: TextStyle(
+                            color: pending
+                                ? AppColors.primaryDark
+                                : AppColors.textLight,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        if ((request['REQUEST_MESSAGE'] ?? '')
+                            .toString()
+                            .isNotEmpty) ...[
+                          const SizedBox(height: 10),
+                          Text(
+                            request['REQUEST_MESSAGE'].toString(),
+                            style: const TextStyle(color: AppColors.textDark),
+                          ),
+                        ],
+                        const SizedBox(height: 12),
+                        if (pending)
+                          Wrap(
+                            spacing: 10,
+                            children: [
+                              FilledButton(
+                                onPressed: () => handle(
+                                  () => service.approveAccessRequest(
+                                    request['ID'] as int,
+                                  ),
+                                ),
+                                child: const Text('Aprovar'),
+                              ),
+                              OutlinedButton(
+                                onPressed: () => handle(
+                                  () => service.rejectAccessRequest(
+                                    request['ID'] as int,
+                                  ),
+                                ),
+                                child: const Text('Rejeitar'),
+                              ),
+                            ],
+                          ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+    );
+  }
 }
 
 class _CategoriesTabState extends _AdminListState<_CategoriesTab> {
@@ -477,7 +613,8 @@ class _CategoriesTabState extends _AdminListState<_CategoriesTab> {
   Widget build(BuildContext context) {
     return buildScaffold(
       title: 'Categorias',
-      description: 'Organize o catalogo por grupos e mantenha a navegacao mais limpa.',
+      description:
+          'Organize o catalogo por grupos e mantenha a navegacao mais limpa.',
       onCreate: () => _showCategoryDialog(),
       child: ListView.separated(
         itemCount: items.length,
@@ -512,7 +649,9 @@ class _CategoriesTabState extends _AdminListState<_CategoriesTab> {
   }
 
   Future<void> _showCategoryDialog({Map<String, dynamic>? category}) async {
-    final name = TextEditingController(text: category?['NAME']?.toString() ?? '');
+    final name = TextEditingController(
+      text: category?['NAME']?.toString() ?? '',
+    );
     final pharmacyId = TextEditingController(
       text: (category?['PHARMACY_ID'] ?? widget.pharmacyId)?.toString() ?? '',
     );
@@ -537,13 +676,10 @@ class _CategoriesTabState extends _AdminListState<_CategoriesTab> {
             onPressed: () async {
               Navigator.pop(dialogContext);
               await handle(
-                () => service.saveCategory(
-                  {
-                    'NAME': name.text,
-                    'PHARMACY_ID': int.tryParse(pharmacyId.text),
-                  },
-                  id: category?['ID'] as int?,
-                ),
+                () => service.saveCategory({
+                  'NAME': name.text,
+                  'PHARMACY_ID': int.tryParse(pharmacyId.text),
+                }, id: category?['ID'] as int?),
               );
             },
             child: const Text('Salvar'),
@@ -603,7 +739,8 @@ class _MedicationsTabState extends _AdminListState<_MedicationsTab> {
                 spacing: 8,
                 children: [
                   IconButton(
-                    onPressed: () => _showMedicationDialog(medication: medication),
+                    onPressed: () =>
+                        _showMedicationDialog(medication: medication),
                     icon: const Icon(Icons.edit),
                   ),
                   IconButton(
@@ -622,7 +759,9 @@ class _MedicationsTabState extends _AdminListState<_MedicationsTab> {
   }
 
   Future<void> _showMedicationDialog({Map<String, dynamic>? medication}) async {
-    final name = TextEditingController(text: medication?['NAME']?.toString() ?? '');
+    final name = TextEditingController(
+      text: medication?['NAME']?.toString() ?? '',
+    );
     final description = TextEditingController(
       text: medication?['DESCRIPTION']?.toString() ?? '',
     );
@@ -639,7 +778,9 @@ class _MedicationsTabState extends _AdminListState<_MedicationsTab> {
     await showDialog<void>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: Text(medication == null ? 'Novo medicamento' : 'Editar medicamento'),
+        title: Text(
+          medication == null ? 'Novo medicamento' : 'Editar medicamento',
+        ),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -661,16 +802,13 @@ class _MedicationsTabState extends _AdminListState<_MedicationsTab> {
             onPressed: () async {
               Navigator.pop(dialogContext);
               await handle(
-                () => service.saveMedication(
-                  {
-                    'NAME': name.text,
-                    'DESCRIPTION': description.text,
-                    'PHARMACY_ID': int.tryParse(pharmacyId.text),
-                    'CATEGORY_ID': int.tryParse(categoryId.text),
-                    'SUBCATEGORY_ID': int.tryParse(subcategoryId.text),
-                  },
-                  id: medication?['ID'] as int?,
-                ),
+                () => service.saveMedication({
+                  'NAME': name.text,
+                  'DESCRIPTION': description.text,
+                  'PHARMACY_ID': int.tryParse(pharmacyId.text),
+                  'CATEGORY_ID': int.tryParse(categoryId.text),
+                  'SUBCATEGORY_ID': int.tryParse(subcategoryId.text),
+                }, id: medication?['ID'] as int?),
               );
             },
             child: const Text('Salvar'),
@@ -713,14 +851,17 @@ class _InventoryTabState extends _AdminListState<_InventoryTab> {
   Widget build(BuildContext context) {
     return buildScaffold(
       title: 'Inventario',
-      description: 'Controle preco, estoque e associacao entre farmacia e medicamento.',
+      description:
+          'Controle preco, estoque e associacao entre farmacia e medicamento.',
       onCreate: () => _showInventoryDialog(),
       child: ListView.separated(
         itemCount: items.length,
         separatorBuilder: (_, __) => const SizedBox(height: 12),
         itemBuilder: (_, index) {
           final inventory = items[index] as Map<String, dynamic>;
-          final med = (inventory['Medication'] ?? inventory['medication']) as Map<String, dynamic>?;
+          final med =
+              (inventory['Medication'] ?? inventory['medication'])
+                  as Map<String, dynamic>?;
           return Card(
             child: ListTile(
               title: Text(med?['NAME']?.toString() ?? 'Item'),
@@ -756,11 +897,15 @@ class _InventoryTabState extends _AdminListState<_InventoryTab> {
     final medicationId = TextEditingController(
       text: inventory?['MEDICATION_ID']?.toString() ?? '',
     );
-    final price = TextEditingController(text: inventory?['PRICE']?.toString() ?? '');
+    final price = TextEditingController(
+      text: inventory?['PRICE']?.toString() ?? '',
+    );
     final originalPrice = TextEditingController(
       text: inventory?['ORIGINAL_PRICE']?.toString() ?? '',
     );
-    final stock = TextEditingController(text: inventory?['STOCK']?.toString() ?? '');
+    final stock = TextEditingController(
+      text: inventory?['STOCK']?.toString() ?? '',
+    );
 
     await showDialog<void>(
       context: context,
@@ -787,16 +932,13 @@ class _InventoryTabState extends _AdminListState<_InventoryTab> {
             onPressed: () async {
               Navigator.pop(dialogContext);
               await handle(
-                () => service.saveInventory(
-                  {
-                    'PHARMACY_ID': int.tryParse(pharmacyId.text),
-                    'MEDICATION_ID': int.tryParse(medicationId.text),
-                    'PRICE': double.tryParse(price.text),
-                    'ORIGINAL_PRICE': double.tryParse(originalPrice.text),
-                    'STOCK': int.tryParse(stock.text),
-                  },
-                  id: inventory?['ID'] as int?,
-                ),
+                () => service.saveInventory({
+                  'PHARMACY_ID': int.tryParse(pharmacyId.text),
+                  'MEDICATION_ID': int.tryParse(medicationId.text),
+                  'PRICE': double.tryParse(price.text),
+                  'ORIGINAL_PRICE': double.tryParse(originalPrice.text),
+                  'STOCK': int.tryParse(stock.text),
+                }, id: inventory?['ID'] as int?),
               );
             },
             child: const Text('Salvar'),
@@ -839,7 +981,8 @@ class _OrdersTabState extends _AdminListState<_OrdersTab> {
   Widget build(BuildContext context) {
     return buildScaffold(
       title: 'Pedidos',
-      description: 'Monitore status, pagamento e acione estorno quando necessario.',
+      description:
+          'Monitore status, pagamento e acione estorno quando necessario.',
       onCreate: () => reload(),
       child: ListView.separated(
         itemCount: items.length,
@@ -861,9 +1004,8 @@ class _OrdersTabState extends _AdminListState<_OrdersTab> {
                     icon: const Icon(Icons.edit),
                   ),
                   TextButton(
-                    onPressed: () => handle(
-                      () => service.refundOrder(order['ID'] as int),
-                    ),
+                    onPressed: () =>
+                        handle(() => service.refundOrder(order['ID'] as int)),
                     child: const Text('Estornar'),
                   ),
                 ],
@@ -876,7 +1018,9 @@ class _OrdersTabState extends _AdminListState<_OrdersTab> {
   }
 
   Future<void> _showOrderDialog(Map<String, dynamic> order) async {
-    final status = TextEditingController(text: order['STATUS']?.toString() ?? '');
+    final status = TextEditingController(
+      text: order['STATUS']?.toString() ?? '',
+    );
     final paymentStatus = TextEditingController(
       text: order['PAYMENT_STATUS']?.toString() ?? '',
     );
@@ -901,13 +1045,10 @@ class _OrdersTabState extends _AdminListState<_OrdersTab> {
             onPressed: () async {
               Navigator.pop(dialogContext);
               await handle(
-                () => service.updateOrder(
-                  order['ID'] as int,
-                  {
-                    'STATUS': status.text,
-                    'PAYMENT_STATUS': paymentStatus.text,
-                  },
-                ),
+                () => service.updateOrder(order['ID'] as int, {
+                  'STATUS': status.text,
+                  'PAYMENT_STATUS': paymentStatus.text,
+                }),
               );
             },
             child: const Text('Salvar'),

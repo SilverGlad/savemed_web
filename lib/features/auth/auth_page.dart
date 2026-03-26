@@ -1,8 +1,12 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 import 'package:SaveMed/core/controllers/address_controller.dart';
 import 'package:SaveMed/core/controllers/auth_controller.dart';
+import 'package:SaveMed/core/services/auth_service.dart';
 import 'package:SaveMed/core/theme/app_colors.dart';
 import 'package:SaveMed/core/utils/document_validator.dart';
 import 'package:SaveMed/core/utils/input_formatters.dart';
@@ -35,7 +39,12 @@ class _AuthPageState extends State<AuthPage> {
           SizedBox(height: isMobile ? 12 : 20),
           Expanded(
             child: SingleChildScrollView(
-              padding: EdgeInsets.fromLTRB(isMobile ? 16 : 24, 0, isMobile ? 16 : 24, 24),
+              padding: EdgeInsets.fromLTRB(
+                isMobile ? 16 : 24,
+                0,
+                isMobile ? 16 : 24,
+                24,
+              ),
               child: Center(
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 1180),
@@ -65,16 +74,22 @@ class _AuthPageState extends State<AuthPage> {
                                   Expanded(
                                     flex: 4,
                                     child: AnimatedSwitcher(
-                                      duration: const Duration(milliseconds: 250),
+                                      duration: const Duration(
+                                        milliseconds: 250,
+                                      ),
                                       child: isLogin
                                           ? LoginCard(
                                               key: const ValueKey('login'),
-                                              onSwitch: () => setState(() => isLogin = false),
+                                              onSwitch: () => setState(
+                                                () => isLogin = false,
+                                              ),
                                               isMobile: isMobile,
                                             )
                                           : RegisterCard(
                                               key: const ValueKey('register'),
-                                              onSwitch: () => setState(() => isLogin = true),
+                                              onSwitch: () => setState(
+                                                () => isLogin = true,
+                                              ),
                                               isMobile: isMobile,
                                             ),
                                     ),
@@ -89,12 +104,14 @@ class _AuthPageState extends State<AuthPage> {
                           child: isLogin
                               ? LoginCard(
                                   key: const ValueKey('login'),
-                                  onSwitch: () => setState(() => isLogin = false),
+                                  onSwitch: () =>
+                                      setState(() => isLogin = false),
                                   isMobile: isMobile,
                                 )
                               : RegisterCard(
                                   key: const ValueKey('register'),
-                                  onSwitch: () => setState(() => isLogin = true),
+                                  onSwitch: () =>
+                                      setState(() => isLogin = true),
                                   isMobile: isMobile,
                                 ),
                         ),
@@ -143,10 +160,7 @@ class _AuthPageState extends State<AuthPage> {
         const SizedBox(height: 10),
         const Text(
           'Acesse sua conta para continuar a compra, consultar entregas e aproveitar uma experiencia simples tanto no celular quanto no computador.',
-          style: TextStyle(
-            color: AppColors.textLight,
-            height: 1.5,
-          ),
+          style: TextStyle(color: AppColors.textLight, height: 1.5),
         ),
         const SizedBox(height: 22),
         Wrap(
@@ -155,7 +169,10 @@ class _AuthPageState extends State<AuthPage> {
           children: const [
             _HeroInfo(icon: Icons.receipt_long_outlined, label: 'Pedidos'),
             _HeroInfo(icon: Icons.local_shipping_outlined, label: 'Entrega'),
-            _HeroInfo(icon: Icons.admin_panel_settings_outlined, label: 'Administracao'),
+            _HeroInfo(
+              icon: Icons.admin_panel_settings_outlined,
+              label: 'Administracao',
+            ),
           ],
         ),
       ],
@@ -171,7 +188,12 @@ class _AuthHeader extends StatelessWidget {
     final isMobile = MediaQuery.of(context).size.width <= 760;
 
     return Container(
-      margin: EdgeInsets.fromLTRB(isMobile ? 12 : 24, 12, isMobile ? 12 : 24, 12),
+      margin: EdgeInsets.fromLTRB(
+        isMobile ? 12 : 24,
+        12,
+        isMobile ? 12 : 24,
+        12,
+      ),
       padding: EdgeInsets.symmetric(
         horizontal: isMobile ? 16 : 22,
         vertical: isMobile ? 14 : 16,
@@ -465,7 +487,9 @@ class _LoginCardState extends State<LoginCard> {
   }
 }
 
-enum RegisterProfileType { customer, seller }
+enum RegisterProfileType { customer, pharmacy }
+
+enum PharmacyRegistrationMode { newPharmacy, existingPharmacy }
 
 class RegisterCard extends StatefulWidget {
   final VoidCallback onSwitch;
@@ -483,24 +507,52 @@ class RegisterCard extends StatefulWidget {
 
 class _RegisterCardState extends State<RegisterCard> {
   RegisterProfileType profile = RegisterProfileType.customer;
+  PharmacyRegistrationMode pharmacyMode = PharmacyRegistrationMode.newPharmacy;
+  final _authService = AuthService();
 
   final docController = TextEditingController();
   final nameController = TextEditingController();
+  final pharmacyNameController = TextEditingController();
+  final cityController = TextEditingController();
+  final stateController = TextEditingController();
+  final zipcodeController = TextEditingController();
   final emailController = TextEditingController();
   final phoneController = TextEditingController();
   final passwordController = TextEditingController();
   final confirmController = TextEditingController();
+  final requestMessageController = TextEditingController();
+  bool _isSubmitting = false;
+  bool _loadingCep = false;
+  bool _loadingPharmacies = false;
+  String? _lastFetchedCep;
+  List<dynamic> _pharmacies = [];
+  int? _selectedPharmacyId;
 
   bool get isCustomer => profile == RegisterProfileType.customer;
+  bool get isNewPharmacy =>
+      pharmacyMode == PharmacyRegistrationMode.newPharmacy;
+
+  @override
+  void initState() {
+    super.initState();
+    zipcodeController.addListener(_handleZipcodeChanged);
+    _loadPharmacies();
+  }
 
   @override
   void dispose() {
+    zipcodeController.removeListener(_handleZipcodeChanged);
     docController.dispose();
     nameController.dispose();
+    pharmacyNameController.dispose();
+    cityController.dispose();
+    stateController.dispose();
+    zipcodeController.dispose();
     emailController.dispose();
     phoneController.dispose();
     passwordController.dispose();
     confirmController.dispose();
+    requestMessageController.dispose();
     super.dispose();
   }
 
@@ -508,35 +560,151 @@ class _RegisterCardState extends State<RegisterCard> {
   Widget build(BuildContext context) {
     return AuthBaseCard(
       title: 'Crie sua conta',
-      subtitle: 'Ja tem conta?',
+      subtitle: _isSubmitting ? 'Criando sua conta...' : 'Ja tem conta?',
       isMobile: widget.isMobile,
       child: Column(
         children: [
           _ProfileSelector(
             selectedProfile: profile,
-            onChanged: (value) => setState(() => profile = value),
+            onChanged: _isSubmitting
+                ? (_) {}
+                : (value) => setState(() {
+                    profile = value;
+                    if (value == RegisterProfileType.customer) {
+                      pharmacyMode = PharmacyRegistrationMode.newPharmacy;
+                    }
+                  }),
           ),
           const SizedBox(height: 16),
+          if (!isCustomer) ...[
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF5FAF8),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: const Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Cadastro de farmacia',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.textDark,
+                    ),
+                  ),
+                  SizedBox(height: 6),
+                  Text(
+                    'Escolha se voce esta cadastrando uma nova farmacia ou se precisa pedir acesso a uma farmacia ja existente.',
+                    style: TextStyle(color: AppColors.textLight, height: 1.4),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            _PharmacyModeSelector(
+              selectedMode: pharmacyMode,
+              onChanged: _isSubmitting
+                  ? (_) {}
+                  : (value) => setState(() => pharmacyMode = value),
+            ),
+            const SizedBox(height: 12),
+          ],
           _Input(
             label: isCustomer ? 'CPF' : 'CNPJ',
             hint: isCustomer ? 'CPF' : 'CNPJ',
             icon: Icons.badge_outlined,
             controller: docController,
             inputFormatters: [isCustomer ? cpfFormatter : cnpjFormatter],
+            enabled: !_isSubmitting,
           ),
           const SizedBox(height: 12),
           _Input(
-            label: isCustomer ? 'Nome completo' : 'Razao social',
-            hint: isCustomer ? 'Nome completo' : 'Razao social',
+            label: isCustomer ? 'Nome completo' : 'Nome do responsavel',
+            hint: isCustomer ? 'Nome completo' : 'Nome do responsavel legal',
             icon: Icons.person_outline,
             controller: nameController,
+            enabled: !_isSubmitting,
           ),
+          if (!isCustomer) ...[
+            if (isNewPharmacy) ...[
+              const SizedBox(height: 12),
+              _Input(
+                label: 'Nome da nova farmacia',
+                hint: 'Nome da farmacia',
+                icon: Icons.local_pharmacy_outlined,
+                controller: pharmacyNameController,
+                enabled: !_isSubmitting,
+              ),
+              const SizedBox(height: 12),
+              _Input(
+                label: 'Cidade',
+                hint: 'Cidade',
+                icon: Icons.location_city_outlined,
+                controller: cityController,
+                enabled: !_isSubmitting,
+              ),
+              const SizedBox(height: 12),
+              _Input(
+                label: 'UF',
+                hint: 'UF',
+                icon: Icons.map_outlined,
+                controller: stateController,
+                enabled: !_isSubmitting,
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z]')),
+                  LengthLimitingTextInputFormatter(2),
+                ],
+              ),
+              const SizedBox(height: 12),
+              _Input(
+                label: 'CEP',
+                hint: '00000-000',
+                icon: Icons.markunread_mailbox_outlined,
+                controller: zipcodeController,
+                enabled: !_isSubmitting,
+                inputFormatters: [cepFormatter],
+                suffix: _loadingCep
+                    ? const Padding(
+                        padding: EdgeInsets.all(14),
+                        child: SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      )
+                    : null,
+              ),
+            ] else ...[
+              _PharmacySelectorField(
+                pharmacies: _pharmacies,
+                loading: _loadingPharmacies,
+                selectedPharmacyId: _selectedPharmacyId,
+                enabled: !_isSubmitting,
+                onChanged: (value) =>
+                    setState(() => _selectedPharmacyId = value),
+              ),
+              const SizedBox(height: 12),
+              _Input(
+                label: 'Mensagem para o admin',
+                hint:
+                    'Ex.: Sou o responsavel pela unidade e preciso acessar o painel.',
+                icon: Icons.mark_email_read_outlined,
+                controller: requestMessageController,
+                enabled: !_isSubmitting,
+                maxLines: 3,
+              ),
+            ],
+          ],
           const SizedBox(height: 12),
           _Input(
             label: 'Email',
             hint: 'Email',
             icon: Icons.email_outlined,
             controller: emailController,
+            enabled: !_isSubmitting,
           ),
           const SizedBox(height: 12),
           _Input(
@@ -545,6 +713,7 @@ class _RegisterCardState extends State<RegisterCard> {
             icon: Icons.phone_outlined,
             controller: phoneController,
             inputFormatters: [phoneFormatter],
+            enabled: !_isSubmitting,
           ),
           const SizedBox(height: 12),
           _Input(
@@ -553,6 +722,7 @@ class _RegisterCardState extends State<RegisterCard> {
             icon: Icons.lock_outline,
             obscure: true,
             controller: passwordController,
+            enabled: !_isSubmitting,
           ),
           const SizedBox(height: 12),
           _Input(
@@ -561,69 +731,184 @@ class _RegisterCardState extends State<RegisterCard> {
             icon: Icons.lock_outline,
             obscure: true,
             controller: confirmController,
+            enabled: !_isSubmitting,
           ),
           const SizedBox(height: 20),
           SizedBox(
             width: double.infinity,
             height: 48,
             child: SaveMedButton(
-              onPressed: () async {
-                final messenger = ScaffoldMessenger.of(context);
-                final authController = context.read<AuthController>();
-                final valid = isCustomer
-                    ? isValidCPF(docController.text)
-                    : isValidCNPJ(docController.text);
-
-                if (!valid) {
-                  messenger.showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        isCustomer ? 'CPF invalido' : 'CNPJ invalido',
-                      ),
-                    ),
-                  );
-                  return;
-                }
-
-                if (passwordController.text.length < 8 ||
-                    passwordController.text != confirmController.text) {
-                  messenger.showSnackBar(
-                    const SnackBar(content: Text('Senha invalida')),
-                  );
-                  return;
-                }
-
-                try {
-                  await authController.register(
-                    isCustomer: isCustomer,
-                    name: nameController.text,
-                    email: emailController.text,
-                    password: passwordController.text,
-                    document: docController.text,
-                    phone: phoneController.text,
-                  );
-
-                  if (!mounted) return;
-                  messenger.showSnackBar(
-                    const SnackBar(content: Text('Conta criada com sucesso')),
-                  );
-                  widget.onSwitch();
-                } catch (e) {
-                  if (!mounted) return;
-                  messenger.showSnackBar(SnackBar(content: Text(e.toString())));
-                }
-              },
+              loading: _isSubmitting,
+              onPressed: _isSubmitting ? null : () => _handleRegister(context),
               label: 'Criar conta',
             ),
           ),
           const SizedBox(height: 12),
           TextButton(
-            onPressed: widget.onSwitch,
+            onPressed: _isSubmitting ? null : widget.onSwitch,
             child: const Text('Fazer login'),
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _handleRegister(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final authController = context.read<AuthController>();
+    final valid = isCustomer
+        ? isValidCPF(docController.text)
+        : isValidCNPJ(docController.text);
+
+    if (!valid) {
+      messenger.showSnackBar(
+        SnackBar(content: Text(isCustomer ? 'CPF invalido' : 'CNPJ invalido')),
+      );
+      return;
+    }
+
+    if (!isCustomer &&
+        isNewPharmacy &&
+        (pharmacyNameController.text.trim().isEmpty ||
+            cityController.text.trim().isEmpty ||
+            stateController.text.trim().length != 2 ||
+            zipcodeController.text.replaceAll(RegExp(r'\D'), '').length != 8)) {
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('Preencha nome da farmacia, cidade, UF e CEP validos'),
+        ),
+      );
+      return;
+    }
+
+    if (!isCustomer && !isNewPharmacy && _selectedPharmacyId == null) {
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Selecione a farmacia ja cadastrada para solicitar acesso',
+          ),
+        ),
+      );
+      return;
+    }
+
+    if (passwordController.text.length < 8 ||
+        passwordController.text != confirmController.text) {
+      messenger.showSnackBar(const SnackBar(content: Text('Senha invalida')));
+      return;
+    }
+
+    FocusScope.of(context).unfocus();
+    setState(() => _isSubmitting = true);
+
+    try {
+      await authController.register(
+        isCustomer: isCustomer,
+        name: nameController.text.trim(),
+        email: emailController.text.trim(),
+        password: passwordController.text,
+        document: docController.text,
+        phone: phoneController.text,
+        useExistingPharmacy: !isCustomer && !isNewPharmacy,
+        pharmacyId: isCustomer ? null : _selectedPharmacyId,
+        pharmacyName: isCustomer || !isNewPharmacy
+            ? null
+            : pharmacyNameController.text.trim(),
+        city: isCustomer || !isNewPharmacy ? null : cityController.text.trim(),
+        state: isCustomer || !isNewPharmacy
+            ? null
+            : stateController.text.trim().toUpperCase(),
+        zipcode: isCustomer || !isNewPharmacy
+            ? null
+            : zipcodeController.text.trim(),
+        requestMessage: isCustomer || isNewPharmacy
+            ? null
+            : requestMessageController.text.trim(),
+      );
+
+      if (!mounted) return;
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            isCustomer
+                ? 'Conta criada com sucesso'
+                : isNewPharmacy
+                ? 'Conta de farmacia criada com sucesso. Verifique seu email.'
+                : 'Solicitacao enviada para aprovacao da farmacia. Verifique seu email.',
+          ),
+        ),
+      );
+      widget.onSwitch();
+    } catch (e) {
+      if (!mounted) return;
+      messenger.showSnackBar(SnackBar(content: Text(_mapRegisterError(e))));
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
+    }
+  }
+
+  String _mapRegisterError(Object error) {
+    final message = error.toString();
+    final normalized = message.toLowerCase();
+
+    if (normalized.contains('email ja cadastrado')) {
+      return 'Este email ja esta em uso.';
+    }
+
+    if (normalized.contains('pharmacy_id')) {
+      return 'Nao foi possivel vincular a farmacia ao usuario. Tente novamente.';
+    }
+
+    return message.replaceFirst('Exception: ', '');
+  }
+
+  void _handleZipcodeChanged() {
+    if (isCustomer || !isNewPharmacy) return;
+
+    final rawCep = zipcodeController.text.replaceAll(RegExp(r'\D'), '');
+    if (rawCep.length != 8 || rawCep == _lastFetchedCep || _loadingCep) return;
+
+    _fetchCep(rawCep);
+  }
+
+  Future<void> _fetchCep(String rawCep) async {
+    setState(() => _loadingCep = true);
+
+    try {
+      final response = await http.get(
+        Uri.parse('https://viacep.com.br/ws/$rawCep/json/'),
+      );
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+
+      if (data['erro'] == true) return;
+
+      cityController.text = (data['localidade'] ?? '').toString();
+      stateController.text = (data['uf'] ?? '').toString().toUpperCase();
+      _lastFetchedCep = rawCep;
+    } catch (_) {
+      // Ignora falhas de CEP e deixa o preenchimento manual disponivel.
+    } finally {
+      if (mounted) {
+        setState(() => _loadingCep = false);
+      }
+    }
+  }
+
+  Future<void> _loadPharmacies() async {
+    setState(() => _loadingPharmacies = true);
+    try {
+      final pharmacies = await _authService.listPharmacies();
+      if (!mounted) return;
+      setState(() => _pharmacies = pharmacies);
+    } catch (_) {
+      if (!mounted) return;
+    } finally {
+      if (mounted) {
+        setState(() => _loadingPharmacies = false);
+      }
+    }
   }
 }
 
@@ -635,6 +920,8 @@ class _Input extends StatelessWidget {
   final bool enabled;
   final List<TextInputFormatter>? inputFormatters;
   final TextEditingController? controller;
+  final Widget? suffix;
+  final int maxLines;
 
   const _Input({
     required this.label,
@@ -644,6 +931,8 @@ class _Input extends StatelessWidget {
     this.enabled = true,
     this.inputFormatters,
     this.controller,
+    this.suffix,
+    this.maxLines = 1,
   });
 
   @override
@@ -658,11 +947,15 @@ class _Input extends StatelessWidget {
           enabled: enabled,
           obscureText: obscure,
           inputFormatters: inputFormatters,
+          maxLines: obscure ? 1 : maxLines,
           decoration: InputDecoration(
             hintText: hint,
             prefixIcon: Icon(icon),
+            suffixIcon: suffix,
             filled: true,
-            fillColor: enabled ? const Color(0xFFF8F9FB) : AppColors.surfaceMuted,
+            fillColor: enabled
+                ? const Color(0xFFF8F9FB)
+                : AppColors.surfaceMuted,
           ),
         ),
       ],
@@ -692,9 +985,9 @@ class _ProfileSelector extends StatelessWidget {
         ),
         const SizedBox(width: 8),
         _button(
-          'Vendedor',
+          'Farmacia',
           !isCustomerActive,
-          () => onChanged(RegisterProfileType.seller),
+          () => onChanged(RegisterProfileType.pharmacy),
         ),
       ],
     );
@@ -720,6 +1013,145 @@ class _ProfileSelector extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _PharmacyModeSelector extends StatelessWidget {
+  final PharmacyRegistrationMode selectedMode;
+  final ValueChanged<PharmacyRegistrationMode> onChanged;
+
+  const _PharmacyModeSelector({
+    required this.selectedMode,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: _modeCard(
+            title: 'Nova farmacia',
+            subtitle: 'Crio a farmacia e a conta admin agora',
+            active: selectedMode == PharmacyRegistrationMode.newPharmacy,
+            onTap: () => onChanged(PharmacyRegistrationMode.newPharmacy),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: _modeCard(
+            title: 'Ja cadastrada',
+            subtitle: 'Peço aprovacao para entrar em uma farmacia existente',
+            active: selectedMode == PharmacyRegistrationMode.existingPharmacy,
+            onTap: () => onChanged(PharmacyRegistrationMode.existingPharmacy),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _modeCard({
+    required String title,
+    required String subtitle,
+    required bool active,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(18),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: active
+              ? AppColors.primary.withValues(alpha: 0.08)
+              : Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: active ? AppColors.primary : AppColors.border,
+            width: active ? 1.4 : 1,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: TextStyle(
+                fontWeight: FontWeight.w800,
+                color: active ? AppColors.primaryDark : AppColors.textDark,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              subtitle,
+              style: const TextStyle(
+                color: AppColors.textLight,
+                fontSize: 12,
+                height: 1.35,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PharmacySelectorField extends StatelessWidget {
+  final List<dynamic> pharmacies;
+  final bool loading;
+  final int? selectedPharmacyId;
+  final bool enabled;
+  final ValueChanged<int?> onChanged;
+
+  const _PharmacySelectorField({
+    required this.pharmacies,
+    required this.loading,
+    required this.selectedPharmacyId,
+    required this.enabled,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Minha farmacia ja esta cadastrada',
+          style: TextStyle(fontSize: 13),
+        ),
+        const SizedBox(height: 6),
+        DropdownButtonFormField<int>(
+          initialValue: selectedPharmacyId,
+          isExpanded: true,
+          decoration: InputDecoration(
+            prefixIcon: const Icon(Icons.store_mall_directory_outlined),
+            filled: true,
+            fillColor: enabled
+                ? const Color(0xFFF8F9FB)
+                : AppColors.surfaceMuted,
+            hintText: loading
+                ? 'Carregando farmacias...'
+                : 'Selecione a farmacia',
+          ),
+          items: pharmacies.map((item) {
+            final pharmacy = item as Map<String, dynamic>;
+            final city = pharmacy['CITY']?.toString() ?? '';
+            final state = pharmacy['STATE']?.toString() ?? '';
+            final suffix = [city, state].where((e) => e.isNotEmpty).join(' - ');
+            final label = suffix.isEmpty
+                ? (pharmacy['NAME']?.toString() ?? 'Farmacia')
+                : '${pharmacy['NAME']} ($suffix)';
+            return DropdownMenuItem<int>(
+              value: pharmacy['ID'] as int,
+              child: Text(label, overflow: TextOverflow.ellipsis),
+            );
+          }).toList(),
+          onChanged: enabled && !loading ? onChanged : null,
+        ),
+      ],
     );
   }
 }

@@ -59,6 +59,13 @@ class AuthController extends ChangeNotifier {
     required String password,
     required String document,
     required String phone,
+    bool useExistingPharmacy = false,
+    int? pharmacyId,
+    String? pharmacyName,
+    String? city,
+    String? state,
+    String? zipcode,
+    String? requestMessage,
   }) async {
     if (isCustomer) {
       await _service.registerCustomer(
@@ -69,13 +76,29 @@ class AuthController extends ChangeNotifier {
         phone: phone,
       );
     } else {
-      await _service.registerSeller(
-        name: name,
-        email: email,
-        password: password,
-        cnpj: document,
-        phone: phone,
-      );
+      if (useExistingPharmacy) {
+        await _service.requestExistingPharmacyAccess(
+          name: name,
+          email: email,
+          password: password,
+          cnpj: document,
+          phone: phone,
+          pharmacyId: pharmacyId!,
+          requestMessage: requestMessage,
+        );
+      } else {
+        await _service.registerSeller(
+          name: name,
+          email: email,
+          password: password,
+          cnpj: document,
+          phone: phone,
+          pharmacyName: pharmacyName!,
+          city: city!,
+          state: state!,
+          zipcode: zipcode!,
+        );
+      }
     }
   }
 
