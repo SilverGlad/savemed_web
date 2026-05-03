@@ -33,6 +33,42 @@ class AuthService {
     return jsonDecode(response.body);
   }
 
+  Future<String> forgotPassword({required String email}) async {
+    final response = await ApiClient.post('/users/forgot-password', {
+      'EMAIL': email,
+    });
+
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+
+    if (response.statusCode != 200) {
+      throw Exception(
+        data['error'] ?? 'Erro ao solicitar recuperação de senha',
+      );
+    }
+
+    return (data['message'] ?? 'Código enviado com sucesso').toString();
+  }
+
+  Future<String> resetPassword({
+    required String email,
+    required String code,
+    required String password,
+  }) async {
+    final response = await ApiClient.post('/users/reset-password', {
+      'EMAIL': email,
+      'CODE': code,
+      'PASSWORD': password,
+    });
+
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+
+    if (response.statusCode != 200) {
+      throw Exception(data['error'] ?? 'Erro ao redefinir senha');
+    }
+
+    return (data['message'] ?? 'Senha redefinida com sucesso').toString();
+  }
+
   Future<List<dynamic>> listPharmacies() async {
     final response = await ApiClient.get('/pharmacies');
 

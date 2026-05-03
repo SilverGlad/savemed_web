@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:SaveMed/core/controllers/cart_controller.dart';
 import 'package:SaveMed/core/theme/app_colors.dart';
 import 'package:SaveMed/core/widgets/confirm_clear_cart_dialog.dart';
+import 'package:SaveMed/features/cart/cart_page.dart';
 import 'package:SaveMed/features/product_detail/product_detail_page.dart';
 import 'package:SaveMed/models/inventory_item.dart';
 
@@ -74,7 +75,8 @@ class _InventoryCardState extends State<InventoryCard> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (widget.item.discount > 0) _badge('${widget.item.discount}% OFF'),
+              if (widget.item.discount > 0)
+                _badge('${widget.item.discount}% OFF'),
 
               const SizedBox(height: 8),
               Center(
@@ -151,11 +153,25 @@ class _InventoryCardState extends State<InventoryCard> {
                         if (!mounted) return;
                         cart.addItem(widget.item);
 
+                        messenger.hideCurrentSnackBar();
                         messenger.showSnackBar(
-                          const SnackBar(
-                            content: Text('Produto adicionado ao carrinho'),
+                          SnackBar(
+                            content: const Text(
+                              'Produto adicionado ao carrinho',
+                            ),
                             duration: Duration(seconds: 2),
                             behavior: SnackBarBehavior.floating,
+                            action: SnackBarAction(
+                              label: 'Ir para o carrinho',
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const CartPage(),
+                                  ),
+                                );
+                              },
+                            ),
                           ),
                         );
                       }

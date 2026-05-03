@@ -187,71 +187,74 @@ class _AuthHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final isMobile = MediaQuery.of(context).size.width <= 760;
 
-    return Container(
-      margin: EdgeInsets.fromLTRB(
-        isMobile ? 12 : 24,
-        12,
-        isMobile ? 12 : 24,
-        12,
-      ),
-      padding: EdgeInsets.symmetric(
-        horizontal: isMobile ? 16 : 22,
-        vertical: isMobile ? 14 : 16,
-      ),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: AppColors.border),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primaryDark.withValues(alpha: 0.06),
-            blurRadius: 18,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [AppColors.primary, AppColors.primaryDark],
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 1180),
+      child: Container(
+        margin: EdgeInsets.fromLTRB(
+          isMobile ? 12 : 0,
+          12,
+          isMobile ? 12 : 0,
+          12,
+        ),
+        padding: EdgeInsets.symmetric(
+          horizontal: isMobile ? 16 : 22,
+          vertical: isMobile ? 14 : 16,
+        ),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(28),
+          border: Border.all(color: AppColors.border),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.primaryDark.withValues(alpha: 0.06),
+              blurRadius: 18,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [AppColors.primary, AppColors.primaryDark],
+                ),
+                borderRadius: BorderRadius.circular(14),
               ),
-              borderRadius: BorderRadius.circular(14),
+              child: Padding(
+                padding: const EdgeInsets.all(8),
+                child: Image.asset('assets/images/logo.png'),
+              ),
             ),
-            child: Padding(
-              padding: const EdgeInsets.all(8),
-              child: Image.asset('assets/images/logo.png'),
-            ),
-          ),
-          const SizedBox(width: 12),
-          const Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'SaveMed',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textDark,
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'SaveMed',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textDark,
+                    ),
                   ),
-                ),
-                SizedBox(height: 2),
-                Text(
-                  'Login obrigatorio',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textLight,
-                    fontWeight: FontWeight.w500,
+                  SizedBox(height: 2),
+                  Text(
+                    'Login obrigatorio',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textLight,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -392,6 +395,15 @@ class _LoginCardState extends State<LoginCard> {
             controller: passwordController,
             enabled: !_isSubmitting,
           ),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton(
+              onPressed: _isSubmitting
+                  ? null
+                  : () => _openForgotPasswordDialog(),
+              child: const Text('Esqueci minha senha'),
+            ),
+          ),
           const SizedBox(height: 20),
           SizedBox(
             width: double.infinity,
@@ -469,6 +481,13 @@ class _LoginCardState extends State<LoginCard> {
     }
   }
 
+  Future<void> _openForgotPasswordDialog() async {
+    await showDialog<void>(
+      context: context,
+      builder: (_) => _ForgotPasswordDialog(initialEmail: emailController.text),
+    );
+  }
+
   String _mapLoginError(Object error) {
     final message = error.toString().toLowerCase();
 
@@ -484,6 +503,214 @@ class _LoginCardState extends State<LoginCard> {
     }
 
     return 'Nao foi possivel entrar agora. Tente novamente em instantes.';
+  }
+}
+
+class _ForgotPasswordDialog extends StatefulWidget {
+  final String initialEmail;
+
+  const _ForgotPasswordDialog({required this.initialEmail});
+
+  @override
+  State<_ForgotPasswordDialog> createState() => _ForgotPasswordDialogState();
+}
+
+class _ForgotPasswordDialogState extends State<_ForgotPasswordDialog> {
+  final _service = AuthService();
+  late final TextEditingController _emailController;
+  final _codeController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _confirmController = TextEditingController();
+
+  bool _sendingCode = false;
+  bool _resettingPassword = false;
+  bool _codeSent = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _emailController = TextEditingController(text: widget.initialEmail.trim());
+  }
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _codeController.dispose();
+    _passwordController.dispose();
+    _confirmController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      title: const Text('Recuperar conta'),
+      content: SizedBox(
+        width: 420,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                _codeSent
+                    ? 'Digite o código enviado para seu email e escolha uma nova senha.'
+                    : 'Informe seu email para receber o código de recuperação.',
+                style: const TextStyle(
+                  color: AppColors.textLight,
+                  height: 1.45,
+                ),
+              ),
+              const SizedBox(height: 18),
+              _Input(
+                label: 'Email',
+                hint: 'Seu email',
+                icon: Icons.email_outlined,
+                controller: _emailController,
+                enabled: !_sendingCode && !_resettingPassword,
+              ),
+              if (_codeSent) ...[
+                const SizedBox(height: 12),
+                _Input(
+                  label: 'Código',
+                  hint: '6 dígitos',
+                  icon: Icons.pin_outlined,
+                  controller: _codeController,
+                  enabled: !_resettingPassword,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(6),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                _Input(
+                  label: 'Nova senha',
+                  hint: 'Nova senha',
+                  icon: Icons.lock_outline,
+                  obscure: true,
+                  controller: _passwordController,
+                  enabled: !_resettingPassword,
+                ),
+                const SizedBox(height: 12),
+                _Input(
+                  label: 'Confirmar nova senha',
+                  hint: 'Confirme a nova senha',
+                  icon: Icons.lock_outline,
+                  obscure: true,
+                  controller: _confirmController,
+                  enabled: !_resettingPassword,
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _sendingCode || _resettingPassword
+              ? null
+              : () => Navigator.of(context).pop(),
+          child: const Text('Cancelar'),
+        ),
+        if (_codeSent)
+          TextButton(
+            onPressed: _sendingCode || _resettingPassword
+                ? null
+                : _handleSendCode,
+            child: const Text('Reenviar código'),
+          ),
+        FilledButton(
+          onPressed: _sendingCode || _resettingPassword
+              ? null
+              : _codeSent
+              ? _handleResetPassword
+              : _handleSendCode,
+          child: Text(
+            _sendingCode
+                ? 'Enviando...'
+                : _resettingPassword
+                ? 'Salvando...'
+                : _codeSent
+                ? 'Redefinir senha'
+                : 'Enviar código',
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _handleSendCode() async {
+    final messenger = ScaffoldMessenger.of(context);
+    final email = _emailController.text.trim();
+
+    if (email.isEmpty) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Informe seu email para continuar')),
+      );
+      return;
+    }
+
+    FocusScope.of(context).unfocus();
+    setState(() => _sendingCode = true);
+
+    try {
+      final message = await _service.forgotPassword(email: email);
+      if (!mounted) return;
+      setState(() => _codeSent = true);
+      messenger.showSnackBar(SnackBar(content: Text(message)));
+    } catch (e) {
+      if (!mounted) return;
+      messenger.showSnackBar(SnackBar(content: Text(_cleanErrorMessage(e))));
+    } finally {
+      if (mounted) {
+        setState(() => _sendingCode = false);
+      }
+    }
+  }
+
+  Future<void> _handleResetPassword() async {
+    final messenger = ScaffoldMessenger.of(context);
+
+    if (_codeController.text.trim().length != 6) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Informe o código de 6 dígitos')),
+      );
+      return;
+    }
+
+    if (_passwordController.text.length < 8 ||
+        _passwordController.text != _confirmController.text) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('A nova senha está inválida')),
+      );
+      return;
+    }
+
+    FocusScope.of(context).unfocus();
+    setState(() => _resettingPassword = true);
+
+    try {
+      final message = await _service.resetPassword(
+        email: _emailController.text.trim(),
+        code: _codeController.text.trim(),
+        password: _passwordController.text,
+      );
+      if (!mounted) return;
+      messenger.showSnackBar(SnackBar(content: Text(message)));
+      Navigator.of(context).pop();
+    } catch (e) {
+      if (!mounted) return;
+      messenger.showSnackBar(SnackBar(content: Text(_cleanErrorMessage(e))));
+    } finally {
+      if (mounted) {
+        setState(() => _resettingPassword = false);
+      }
+    }
+  }
+
+  String _cleanErrorMessage(Object error) {
+    return error.toString().replaceFirst('Exception: ', '');
   }
 }
 

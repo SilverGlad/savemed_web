@@ -5,7 +5,7 @@ import '../storage/token_storage.dart';
 
 class ApiClient {
   static const String baseUrl =
-      'https://api-savemed-production.up.railway.app/api';
+      'https://api-savemed-146487220267.southamerica-east1.run.app/api';
 
   static Future<Map<String, String>> _headers() async {
     final token = await TokenStorage.getToken();

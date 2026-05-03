@@ -37,71 +37,79 @@ class ProductDetailPage extends StatelessWidget {
             child: SingleChildScrollView(
               padding: EdgeInsets.all(isMobile ? 16 : 24),
               child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 960),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // =====================
-                      // DESKTOP
-                      // =====================
-                      if (!isMobile) ...[
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            SizedBox(
-                              width: 420,
-                              child: _card(child: _productImage(med.image)),
+                child: Column(
+                  children: [
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 960),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // =====================
+                          // DESKTOP
+                          // =====================
+                          if (!isMobile) ...[
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                SizedBox(
+                                  width: 420,
+                                  child: _card(child: _productImage(med.image)),
+                                ),
+                                const SizedBox(width: 24),
+                                SizedBox(
+                                  width: 420,
+                                  child: _card(
+                                    child: _infoBlock(
+                                      context,
+                                      med.name,
+                                      item.price,
+                                      item.originalPrice,
+                                      hasDiscount,
+                                      available,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
-                            const SizedBox(width: 24),
+                            const SizedBox(height: 24),
                             SizedBox(
                               width: 420,
                               child: _card(
-                                child: _infoBlock(
-                                  context,
-                                  med.name,
-                                  item.price,
-                                  item.originalPrice,
-                                  hasDiscount,
-                                  available,
-                                ),
+                                child: _descriptionBlock(med.description),
                               ),
                             ),
                           ],
-                        ),
-                        const SizedBox(height: 24),
-                        SizedBox(
-                          width: 420,
-                          child: _card(
-                            child: _descriptionBlock(med.description),
-                          ),
-                        ),
-                      ],
 
-                      // =====================
-                      // MOBILE
-                      // =====================
-                      if (isMobile) ...[
-                        _card(child: _productImage(med.image)),
-                        const SizedBox(height: 16),
-                        _card(
-                          child: _infoBlock(
-                            context,
-                            med.name,
-                            item.price,
-                            item.originalPrice,
-                            hasDiscount,
-                            available,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        _card(child: _descriptionBlock(med.description)),
-                      ],
+                          // =====================
+                          // MOBILE
+                          // =====================
+                          if (isMobile) ...[
+                            _card(child: _productImage(med.image)),
+                            const SizedBox(height: 16),
+                            _card(
+                              child: _infoBlock(
+                                context,
+                                med.name,
+                                item.price,
+                                item.originalPrice,
+                                hasDiscount,
+                                available,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            _card(child: _descriptionBlock(med.description)),
+                          ],
 
-                      SizedBox(height: isMobile ? 32 : 64),
-                      const SaveMedFooter(),
-                    ],
-                  ),
+                          SizedBox(height: isMobile ? 32 : 64),
+                        ],
+                      ),
+                    ),
+
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 32.0),
+                      child: const SaveMedFooter(),
+                    ),
+                  ],
                 ),
               ),
             ),

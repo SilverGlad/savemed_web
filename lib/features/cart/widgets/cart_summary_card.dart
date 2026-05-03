@@ -45,9 +45,10 @@ class _CartSummaryCardState extends State<CartSummaryCard> {
     _maybeCalculateShipping(pharmacyCep, cart);
 
     final addressCtrl = context.watch<AddressController>();
-    final validOptions = cart.shippingOptions
-        .where((option) => option['price'] != null)
-        .toList();
+    final validOptions = [
+      ...cart.localDeliveryOptions,
+      ...cart.shippingOptions.where((option) => option['price'] != null),
+    ];
 
     return Container(
       width: double.infinity,
@@ -101,7 +102,11 @@ class _CartSummaryCardState extends State<CartSummaryCard> {
                   const SizedBox(height: 12),
                   Row(
                     children: [
-                      const Icon(Icons.local_pharmacy, color: Colors.white, size: 18),
+                      const Icon(
+                        Icons.local_pharmacy,
+                        color: Colors.white,
+                        size: 18,
+                      ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
@@ -144,8 +149,7 @@ class _CartSummaryCardState extends State<CartSummaryCard> {
                 return _SelectableCard(
                   selected: selected,
                   icon: Icons.location_on_outlined,
-                  title:
-                      '${address['STREET']}, ${address['NUMBER'] ?? 's/n'}',
+                  title: '${address['STREET']}, ${address['NUMBER'] ?? 's/n'}',
                   subtitle:
                       '${address['CITY']} - ${address['STATE']} | CEP ${address['CEP']}',
                   onTap: () {
@@ -169,15 +173,19 @@ class _CartSummaryCardState extends State<CartSummaryCard> {
           ),
           _ValueRow(
             label: 'Total',
-            value: _format(cart.subtotal + _shippingPrice(cart.selectedShipping)),
+            value: _format(
+              cart.subtotal + _shippingPrice(cart.selectedShipping),
+            ),
             bold: true,
           ),
           const SizedBox(height: 18),
           SaveMedButton(
             label: 'Continuar compra',
             icon: Icons.east,
-            onPressed: cart.items.isEmpty ||
-                    cart.selectedAddress == null ||
+            onPressed:
+                cart.items.isEmpty ||
+                    (cart.needsDeliveryAddress &&
+                        cart.selectedAddress == null) ||
                     cart.selectedShipping == null
                 ? null
                 : () {
@@ -213,17 +221,32 @@ class _CartSummaryCardState extends State<CartSummaryCard> {
   }
 }
 
-class _ShippingSection extends StatelessWidget {
+class _ShippingSection extends StatefulWidget {
   final CartController cart;
   final List<dynamic> validOptions;
 
-  const _ShippingSection({
-    required this.cart,
-    required this.validOptions,
-  });
+  const _ShippingSection({required this.cart, required this.validOptions});
+
+  @override
+  State<_ShippingSection> createState() => _ShippingSectionState();
+}
+
+class _ShippingSectionState extends State<_ShippingSection> {
+  bool _showMelhorEnvioOptions = false;
 
   @override
   Widget build(BuildContext context) {
+    final cart = widget.cart;
+    final validOptions = widget.validOptions;
+    final melhorEnvioOptions = validOptions
+        .where((option) => option['method'] == 'melhor_envio')
+        .toList();
+    final visibleOptions = validOptions
+        .where((option) => option['method'] != 'melhor_envio')
+        .toList();
+    final selectedMelhorEnvio =
+        cart.selectedShipping?['method'] == 'melhor_envio';
+
     if (cart.selectedAddress == null) {
       return const Padding(
         padding: EdgeInsets.only(top: 6),
@@ -254,6 +277,16 @@ class _ShippingSection extends StatelessWidget {
       );
     }
 
+    if (cart.shippingError != null && validOptions.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 6),
+        child: Text(
+          cart.shippingError!,
+          style: const TextStyle(color: Colors.redAccent, fontSize: 13),
+        ),
+      );
+    }
+
     if (validOptions.isEmpty) {
       return const Padding(
         padding: EdgeInsets.only(top: 6),
@@ -266,13 +299,25 @@ class _ShippingSection extends StatelessWidget {
 
     return Column(
       children: [
+        if (cart.shippingError != null) ...[
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Text(
+              cart.shippingError!,
+              style: const TextStyle(color: Colors.redAccent, fontSize: 13),
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
         const SizedBox(height: 8),
-        for (final option in validOptions)
+        for (final option in visibleOptions)
           _SelectableCard(
             selected: cart.selectedShipping?['id'] == option['id'],
-            icon: Icons.local_shipping_outlined,
-            title: '${option['company']['name']} - ${option['name']}',
-            subtitle: '${option['delivery_time']} dias',
+            icon: option['method'] == 'pickup'
+                ? Icons.storefront_outlined
+                : Icons.local_shipping_outlined,
+            title: _shippingTitle(option),
+            subtitle: _shippingSubtitle(option),
             trailing: Text(
               _format(double.tryParse(option['price'].toString()) ?? 0),
               style: const TextStyle(
@@ -282,6 +327,45 @@ class _ShippingSection extends StatelessWidget {
             ),
             onTap: () => cart.selectShipping(option),
           ),
+        if (melhorEnvioOptions.isNotEmpty)
+          _SelectableCard(
+            selected: selectedMelhorEnvio,
+            icon: Icons.local_shipping_outlined,
+            title: 'Entrega Melhor Envio',
+            subtitle: _showMelhorEnvioOptions
+                ? 'Escolha uma das opcoes abaixo.'
+                : '${melhorEnvioOptions.length} opcoes disponiveis a partir de ${_format(_lowestPrice(melhorEnvioOptions))}.',
+            trailing: Icon(
+              _showMelhorEnvioOptions
+                  ? Icons.expand_less_rounded
+                  : Icons.expand_more_rounded,
+              color: AppColors.primaryDark,
+            ),
+            onTap: () {
+              setState(
+                () => _showMelhorEnvioOptions = !_showMelhorEnvioOptions,
+              );
+            },
+          ),
+        if (_showMelhorEnvioOptions)
+          for (final option in melhorEnvioOptions)
+            Padding(
+              padding: const EdgeInsets.only(left: 12),
+              child: _SelectableCard(
+                selected: cart.selectedShipping?['id'] == option['id'],
+                icon: Icons.local_shipping_outlined,
+                title: _shippingTitle(option),
+                subtitle: _shippingSubtitle(option),
+                trailing: Text(
+                  _format(double.tryParse(option['price'].toString()) ?? 0),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textDark,
+                  ),
+                ),
+                onTap: () => cart.selectShipping(option),
+              ),
+            ),
       ],
     );
   }
@@ -389,10 +473,7 @@ class _SelectableCard extends StatelessWidget {
                 ],
               ),
             ),
-            if (trailing != null) ...[
-              const SizedBox(width: 10),
-              trailing!,
-            ],
+            if (trailing != null) ...[const SizedBox(width: 10), trailing!],
           ],
         ),
       ),
@@ -468,5 +549,49 @@ double _shippingPrice(Map<String, dynamic>? shipping) {
   return double.tryParse(shipping['price'].toString()) ?? 0;
 }
 
+double _lowestPrice(List<dynamic> options) {
+  final prices = options
+      .map((option) => double.tryParse(option['price'].toString()))
+      .whereType<double>()
+      .toList();
+
+  if (prices.isEmpty) return 0;
+  prices.sort();
+  return prices.first;
+}
+
 String _format(double value) =>
     'R\$ ${value.toStringAsFixed(2).replaceAll('.', ',')}';
+
+String _shippingTitle(Map<String, dynamic> option) {
+  final company = option['company']?['name']?.toString();
+  final name = option['name']?.toString();
+
+  if (company == null || company.isEmpty) {
+    return name ?? 'Entrega';
+  }
+
+  if (name == null || name.isEmpty) {
+    return company;
+  }
+
+  return '$company - $name';
+}
+
+String _shippingSubtitle(Map<String, dynamic> option) {
+  if (option['method'] == 'pickup') {
+    return option['description']?.toString() ?? 'Retirada na farmacia.';
+  }
+
+  if (option['method'] == 'own_delivery') {
+    return option['description']?.toString() ??
+        'Entrega realizada pela farmacia.';
+  }
+
+  final deliveryTime = option['delivery_time']?.toString();
+  if (deliveryTime == null || deliveryTime.isEmpty) {
+    return 'Prazo a confirmar';
+  }
+
+  return '$deliveryTime dias';
+}

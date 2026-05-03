@@ -15,7 +15,7 @@ class OrderController extends ChangeNotifier {
   Future<int> createOrder({
     required int customerId,
     required int pharmacyId,
-    required int addressId,
+    int? addressId,
     required Map<String, dynamic> shipping,
     required double subtotal,
   }) async {
@@ -24,12 +24,21 @@ class OrderController extends ChangeNotifier {
 
     final shippingPrice = toDouble(shipping['price']);
     final total = subtotal + shippingPrice;
+    final deliveryMethod = shipping['method']?.toString() ?? 'shipping';
+    final companyName = shipping['company']?['name']?.toString();
+    final serviceName = shipping['name']?.toString();
+    final deliveryLabel = [
+      companyName,
+      serviceName,
+    ].whereType<String>().where((value) => value.isNotEmpty).join(' - ');
 
     final id = await _service.createOrder(
       customerId: customerId,
       pharmacyId: pharmacyId,
       addressId: addressId,
       shippingPrice: shippingPrice,
+      deliveryMethod: deliveryMethod,
+      deliveryLabel: deliveryLabel.isEmpty ? null : deliveryLabel,
       subtotal: subtotal,
       total: total,
     );

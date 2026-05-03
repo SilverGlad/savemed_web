@@ -17,7 +17,7 @@ class AdminPage extends StatelessWidget {
     final isAppAdmin = role == 'app_admin';
 
     final tabs = <Tab>[
-      if (isAppAdmin) const Tab(text: 'Farmacias'),
+      const Tab(text: 'Farmacias'),
       const Tab(text: 'Solicitacoes'),
       const Tab(text: 'Categorias'),
       const Tab(text: 'Medicamentos'),
@@ -26,7 +26,10 @@ class AdminPage extends StatelessWidget {
     ];
 
     final views = <Widget>[
-      if (isAppAdmin) const _PharmaciesTab(),
+      _PharmaciesTab(
+        pharmacyId: isAppAdmin ? null : pharmacyId,
+        canCreate: isAppAdmin,
+      ),
       _AccessRequestsTab(pharmacyId: isAppAdmin ? null : pharmacyId),
       _CategoriesTab(pharmacyId: isAppAdmin ? null : pharmacyId),
       _MedicationsTab(pharmacyId: isAppAdmin ? null : pharmacyId),
@@ -332,7 +335,10 @@ abstract class _AdminListState<T extends StatefulWidget> extends State<T> {
 }
 
 class _PharmaciesTab extends StatefulWidget {
-  const _PharmaciesTab();
+  final int? pharmacyId;
+  final bool canCreate;
+
+  const _PharmaciesTab({this.pharmacyId, required this.canCreate});
 
   @override
   State<_PharmaciesTab> createState() => _PharmaciesTabState();
@@ -349,7 +355,12 @@ class _PharmaciesTabState extends _AdminListState<_PharmaciesTab> {
   Future<void> reload() async {
     setState(() => loading = true);
     try {
-      items = await service.listPharmacies();
+      final pharmacies = await service.listPharmacies();
+      items = widget.pharmacyId == null
+          ? pharmacies
+          : pharmacies
+                .where((item) => item['ID'] == widget.pharmacyId)
+                .toList();
     } catch (e) {
       error = e.toString();
     }
@@ -359,11 +370,14 @@ class _PharmaciesTabState extends _AdminListState<_PharmaciesTab> {
 
   @override
   Widget build(BuildContext context) {
+    final canCreate = widget.canCreate && widget.pharmacyId == null;
+
     return buildScaffold(
       title: 'Farmacias',
       description:
           'Visualize unidades cadastradas e mantenha os dados operacionais atualizados.',
-      onCreate: () => _showPharmacyDialog(),
+      onCreate: canCreate ? () => _showPharmacyDialog() : reload,
+      createLabel: canCreate ? 'Nova' : 'Atualizar',
       child: ListView.separated(
         itemCount: items.length,
         separatorBuilder: (_, __) => const SizedBox(height: 12),
@@ -386,12 +400,13 @@ class _PharmaciesTabState extends _AdminListState<_PharmaciesTab> {
                     onPressed: () => _showPharmacyDialog(pharmacy: pharmacy),
                     icon: const Icon(Icons.edit),
                   ),
-                  IconButton(
-                    onPressed: () => handle(
-                      () => service.deletePharmacy(pharmacy['ID'] as int),
+                  if (widget.canCreate)
+                    IconButton(
+                      onPressed: () => handle(
+                        () => service.deletePharmacy(pharmacy['ID'] as int),
+                      ),
+                      icon: const Icon(Icons.delete),
                     ),
-                    icon: const Icon(Icons.delete),
-                  ),
                 ],
               ),
             ),
@@ -417,44 +432,116 @@ class _PharmaciesTabState extends _AdminListState<_PharmaciesTab> {
     final zip = TextEditingController(
       text: pharmacy?['ZIPCODE']?.toString() ?? '',
     );
+    final ownDeliveryPrice = TextEditingController(
+      text: pharmacy?['OWN_DELIVERY_PRICE']?.toString() ?? '',
+    );
+    final ownDeliveryPricePerKm = TextEditingController(
+      text: pharmacy?['OWN_DELIVERY_PRICE_PER_KM']?.toString() ?? '',
+    );
+    final ownDeliveryMaxDistanceKm = TextEditingController(
+      text: pharmacy?['OWN_DELIVERY_MAX_DISTANCE_KM']?.toString() ?? '',
+    );
+    final ownDeliveryNote = TextEditingController(
+      text: pharmacy?['OWN_DELIVERY_NOTE']?.toString() ?? '',
+    );
+    var acceptsOwnDelivery = pharmacy?['ACCEPTS_OWN_DELIVERY'] == true;
+    var acceptsPickup = pharmacy?['ACCEPTS_PICKUP'] == true;
 
     await showDialog<void>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(pharmacy == null ? 'Nova farmacia' : 'Editar farmacia'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _input(name, 'Nome'),
-              _input(phone, 'Telefone'),
-              _input(city, 'Cidade'),
-              _input(stateCtrl, 'Estado'),
-              _input(zip, 'CEP'),
-            ],
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setModalState) => AlertDialog(
+          title: Text(pharmacy == null ? 'Nova farmacia' : 'Editar farmacia'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _input(name, 'Nome'),
+                _input(phone, 'Telefone'),
+                _input(city, 'Cidade'),
+                _input(stateCtrl, 'Estado'),
+                _input(zip, 'CEP'),
+                SwitchListTile(
+                  value: acceptsOwnDelivery,
+                  title: const Text('Entrega propria'),
+                  subtitle: const Text(
+                    'Entrega calculada por distancia conforme a configuracao.',
+                  ),
+                  contentPadding: EdgeInsets.zero,
+                  onChanged: (value) {
+                    setModalState(() => acceptsOwnDelivery = value);
+                  },
+                ),
+                if (acceptsOwnDelivery) ...[
+                  _input(ownDeliveryPrice, 'Valor base da entrega'),
+                  _input(ownDeliveryPricePerKm, 'Valor por km'),
+                  _input(ownDeliveryMaxDistanceKm, 'Raio maximo em km'),
+                  _input(ownDeliveryNote, 'Observacoes da entrega'),
+                ],
+                SwitchListTile(
+                  value: acceptsPickup,
+                  title: const Text('Retirada no local'),
+                  subtitle: const Text(
+                    'Cliente pode retirar direto na farmacia.',
+                  ),
+                  contentPadding: EdgeInsets.zero,
+                  onChanged: (value) {
+                    setModalState(() => acceptsPickup = value);
+                  },
+                ),
+              ],
+            ),
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () async {
+                Navigator.pop(dialogContext);
+                await handle(
+                  () => service.savePharmacy({
+                    'NAME': name.text,
+                    'PHONE': phone.text,
+                    'CITY': city.text,
+                    'STATE': stateCtrl.text,
+                    'ZIPCODE': zip.text,
+                    'ACCEPTS_OWN_DELIVERY': acceptsOwnDelivery,
+                    'ACCEPTS_PICKUP': acceptsPickup,
+                    'OWN_DELIVERY_PRICE': acceptsOwnDelivery
+                        ? double.tryParse(
+                            ownDeliveryPrice.text.trim().replaceAll(',', '.'),
+                          )
+                        : null,
+                    'OWN_DELIVERY_PRICE_PER_KM': acceptsOwnDelivery
+                        ? double.tryParse(
+                            ownDeliveryPricePerKm.text.trim().replaceAll(
+                              ',',
+                              '.',
+                            ),
+                          )
+                        : null,
+                    'OWN_DELIVERY_MAX_DISTANCE_KM': acceptsOwnDelivery
+                        ? double.tryParse(
+                            ownDeliveryMaxDistanceKm.text.trim().replaceAll(
+                              ',',
+                              '.',
+                            ),
+                          )
+                        : null,
+                    'OWN_DELIVERY_NOTE':
+                        acceptsOwnDelivery &&
+                            ownDeliveryNote.text.trim().isNotEmpty
+                        ? ownDeliveryNote.text.trim()
+                        : null,
+                  }, id: pharmacy?['ID'] as int?),
+                );
+              },
+              child: const Text('Salvar'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () async {
-              Navigator.pop(dialogContext);
-              await handle(
-                () => service.savePharmacy({
-                  'NAME': name.text,
-                  'PHONE': phone.text,
-                  'CITY': city.text,
-                  'STATE': stateCtrl.text,
-                  'ZIPCODE': zip.text,
-                }, id: pharmacy?['ID'] as int?),
-              );
-            },
-            child: const Text('Salvar'),
-          ),
-        ],
       ),
     );
   }

@@ -40,13 +40,13 @@ class _HomePageState extends State<HomePage> {
           SliverToBoxAdapter(
             child: Padding(
               padding: EdgeInsets.fromLTRB(
-                isMobile ? 12 : 24,
+                isMobile ? 12 : 64,
                 0,
-                isMobile ? 12 : 24,
+                isMobile ? 12 : 64,
                 18,
               ),
               child: Container(
-                padding: EdgeInsets.all(isMobile ? 20 : 28),
+                padding: EdgeInsets.all(isMobile ? 20 : 12),
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
                     colors: [AppColors.primaryDark, AppColors.primary],
@@ -78,10 +78,11 @@ class _HomePageState extends State<HomePage> {
                     const SizedBox(height: 14),
                     Text(
                       'Sua farmácia digital com navegação mais leve e direta.',
-                      style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                        color: Colors.white,
-                        fontSize: isMobile ? 28 : 34,
-                      ),
+                      style: Theme.of(context).textTheme.headlineMedium
+                          ?.copyWith(
+                            color: Colors.white,
+                            fontSize: isMobile ? 28 : 34,
+                          ),
                     ),
                     const SizedBox(height: 10),
                     Text(
@@ -102,7 +103,7 @@ class _HomePageState extends State<HomePage> {
             child: Padding(
               padding: EdgeInsets.symmetric(
                 horizontal: isMobile ? 0 : 0,
-                vertical: isMobile ? 0 : 0,
+                vertical: isMobile ? 12 : 12,
               ),
               child: const BannerCarousel(),
             ),
@@ -121,10 +122,8 @@ class _HomePageState extends State<HomePage> {
 
           SliverToBoxAdapter(
             child: Consumer<HomeInventoryController>(
-              builder: (_, ctrl, __) => InventorySection(
-                title: 'Medicamentos',
-                items: ctrl.products,
-              ),
+              builder: (_, ctrl, __) =>
+                  InventorySection(title: 'Medicamentos', items: ctrl.products),
             ),
           ),
 
@@ -140,9 +139,9 @@ class _HomePageState extends State<HomePage> {
           SliverToBoxAdapter(
             child: Padding(
               padding: EdgeInsets.fromLTRB(
-                isMobile ? 12 : 24,
+                isMobile ? 12 : 40,
                 10,
-                isMobile ? 12 : 24,
+                isMobile ? 12 : 40,
                 isMobile ? 20 : 30,
               ),
               child: const SaveMedFooter(),

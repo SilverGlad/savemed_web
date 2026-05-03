@@ -23,7 +23,8 @@ class _BannerCarouselState extends State<BannerCarousel> {
       assetPath: 'assets/banners/banner1.jpg',
       eyebrow: 'Entrega agil',
       title: 'Seu cuidado diario sem fila e sem pressa',
-      subtitle: 'Medicamentos, higiene e beleza com experiencia mobile simples.',
+      subtitle:
+          'Medicamentos, higiene e beleza com experiencia mobile simples.',
     ),
     _BannerItem(
       assetPath: 'assets/banners/banner2.jpg',
@@ -94,7 +95,9 @@ class _BannerCarouselState extends State<BannerCarousel> {
                         borderRadius: BorderRadius.circular(30),
                         boxShadow: [
                           BoxShadow(
-                            color: AppColors.primaryDark.withValues(alpha: 0.18),
+                            color: AppColors.primaryDark.withValues(
+                              alpha: 0.18,
+                            ),
                             blurRadius: 28,
                             offset: const Offset(0, 14),
                           ),
@@ -116,7 +119,9 @@ class _BannerCarouselState extends State<BannerCarousel> {
                                   begin: Alignment.centerLeft,
                                   end: Alignment.centerRight,
                                   colors: [
-                                    AppColors.primaryDark.withValues(alpha: 0.88),
+                                    AppColors.primaryDark.withValues(
+                                      alpha: 0.88,
+                                    ),
                                     AppColors.primary.withValues(alpha: 0.54),
                                     Colors.transparent,
                                   ],
@@ -125,7 +130,7 @@ class _BannerCarouselState extends State<BannerCarousel> {
                               ),
                             ),
                             Padding(
-                              padding: EdgeInsets.all(isMobile ? 22 : 34),
+                              padding: EdgeInsets.all(isMobile ? 22 : 12),
                               child: ConstrainedBox(
                                 constraints: BoxConstraints(
                                   maxWidth: isMobile ? 220 : 360,
@@ -140,8 +145,12 @@ class _BannerCarouselState extends State<BannerCarousel> {
                                         vertical: 8,
                                       ),
                                       decoration: BoxDecoration(
-                                        color: AppColors.accent.withValues(alpha: 0.95),
-                                        borderRadius: BorderRadius.circular(999),
+                                        color: AppColors.accent.withValues(
+                                          alpha: 0.95,
+                                        ),
+                                        borderRadius: BorderRadius.circular(
+                                          999,
+                                        ),
                                       ),
                                       child: Text(
                                         banner.eyebrow,
@@ -168,7 +177,9 @@ class _BannerCarouselState extends State<BannerCarousel> {
                                       style: TextStyle(
                                         fontSize: isMobile ? 13 : 15,
                                         height: 1.35,
-                                        color: Colors.white.withValues(alpha: 0.9),
+                                        color: Colors.white.withValues(
+                                          alpha: 0.9,
+                                        ),
                                       ),
                                     ),
                                   ],

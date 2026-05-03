@@ -63,6 +63,7 @@ class MyApp extends StatelessWidget {
       ],
       child: MaterialApp(
         debugShowCheckedModeBanner: false,
+        title: 'SaveMed',
         theme: AppTheme.light,
         home: const AuthPage(),
       ),

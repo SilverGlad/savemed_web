@@ -40,8 +40,13 @@ class _InventorySectionState extends State<InventorySection> {
     }
 
     return Container(
-      margin: EdgeInsets.fromLTRB(isMobile ? 12 : 24, 0, isMobile ? 12 : 24, 18),
-      padding: EdgeInsets.all(isMobile ? 18 : 24),
+      margin: EdgeInsets.fromLTRB(
+        isMobile ? 12 : 64,
+        0,
+        isMobile ? 12 : 64,
+        18,
+      ),
+      padding: EdgeInsets.all(isMobile ? 18 : 64),
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(28),
@@ -51,10 +56,7 @@ class _InventorySectionState extends State<InventorySection> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (widget.title.isNotEmpty) ...[
-            Text(
-              widget.title,
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
+            Text(widget.title, style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 6),
             const Text(
               'Selecao pensada para compra rapida e leitura facil no celular.',
@@ -87,7 +89,8 @@ class _InventorySectionState extends State<InventorySection> {
                 scrollDirection: Axis.horizontal,
                 physics: const ClampingScrollPhysics(),
                 itemCount: widget.items.length,
-                separatorBuilder: (_, __) => SizedBox(width: isMobile ? 12 : 16),
+                separatorBuilder: (_, __) =>
+                    SizedBox(width: isMobile ? 12 : 16),
                 itemBuilder: (_, index) {
                   return InventoryCard(item: widget.items[index]);
                 },

@@ -5,7 +5,6 @@ import 'package:SaveMed/core/controllers/auth_controller.dart';
 import 'package:SaveMed/core/controllers/cart_controller.dart';
 import 'package:SaveMed/core/controllers/order_controller.dart';
 import 'package:SaveMed/core/theme/app_colors.dart';
-import 'package:SaveMed/core/utils/input_formatters.dart';
 import 'package:SaveMed/core/widgets/savemed_button.dart';
 import 'package:SaveMed/core/widgets/savemed_footer.dart';
 import 'package:SaveMed/core/widgets/savemed_header.dart';
@@ -20,9 +19,7 @@ class CheckoutPage extends StatelessWidget {
     final auth = context.watch<AuthController>();
 
     if (cart.items.isEmpty) {
-      return const Scaffold(
-        body: Center(child: Text('Carrinho vazio')),
-      );
+      return const Scaffold(body: Center(child: Text('Carrinho vazio')));
     }
 
     return Scaffold(
@@ -113,7 +110,10 @@ class _CheckoutHero extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.primary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(999),
@@ -152,13 +152,13 @@ class _CheckoutHero extends StatelessWidget {
               ),
               _HeroPill(
                 label: 'Frete',
-                value: _format(toDouble(cart.selectedShipping?['price'])),
+                value: _format(_shippingPrice(cart.selectedShipping)),
                 icon: Icons.local_shipping_outlined,
               ),
               _HeroPill(
                 label: 'Total',
                 value: _format(
-                  cart.subtotal + toDouble(cart.selectedShipping?['price']),
+                  cart.subtotal + _shippingPrice(cart.selectedShipping),
                 ),
                 icon: Icons.payments_outlined,
               ),
@@ -247,30 +247,48 @@ class _LeftColumn extends StatelessWidget {
         ),
         const SizedBox(height: 14),
         _SectionCard(
-          title: 'Entrega',
+          title: cart.isPickupSelected ? 'Retirada' : 'Entrega',
           icon: Icons.location_on_outlined,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                '${cart.selectedAddress?['STREET']}, ${cart.selectedAddress?['NUMBER'] ?? 's/n'}',
-                style: const TextStyle(
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textDark,
+          child: cart.isPickupSelected
+              ? const Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Retirada diretamente na farmacia.',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textDark,
+                      ),
+                    ),
+                    SizedBox(height: 6),
+                    Text(
+                      'Nao e necessario informar endereco de entrega para este pedido.',
+                      style: TextStyle(color: AppColors.textLight),
+                    ),
+                  ],
+                )
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${cart.selectedAddress?['STREET']}, ${cart.selectedAddress?['NUMBER'] ?? 's/n'}',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textDark,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      '${cart.selectedAddress?['NEIGHBORHOOD'] ?? ''} ${cart.selectedAddress?['CITY']} - ${cart.selectedAddress?['STATE']}',
+                      style: const TextStyle(color: AppColors.textLight),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'CEP ${cart.selectedAddress?['CEP'] ?? '-'}',
+                      style: const TextStyle(color: AppColors.textLight),
+                    ),
+                  ],
                 ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                '${cart.selectedAddress?['NEIGHBORHOOD'] ?? ''} ${cart.selectedAddress?['CITY']} - ${cart.selectedAddress?['STATE']}',
-                style: const TextStyle(color: AppColors.textLight),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                'CEP ${cart.selectedAddress?['CEP'] ?? '-'}',
-                style: const TextStyle(color: AppColors.textLight),
-              ),
-            ],
-          ),
         ),
         const SizedBox(height: 14),
         _SectionCard(
@@ -343,7 +361,7 @@ class _LeftColumn extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '${cart.selectedShipping?['company']['name']} - ${cart.selectedShipping?['name']}',
+                      _shippingTitle(cart.selectedShipping),
                       style: const TextStyle(
                         fontWeight: FontWeight.w700,
                         color: AppColors.textDark,
@@ -351,14 +369,14 @@ class _LeftColumn extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '${cart.selectedShipping?['delivery_time']} dias',
+                      _shippingSubtitle(cart.selectedShipping),
                       style: const TextStyle(color: AppColors.textLight),
                     ),
                   ],
                 ),
               ),
               Text(
-                _format(toDouble(cart.selectedShipping?['price'])),
+                _format(_shippingPrice(cart.selectedShipping)),
                 style: const TextStyle(
                   fontWeight: FontWeight.w800,
                   color: AppColors.textDark,
@@ -376,10 +394,7 @@ class _RightColumn extends StatelessWidget {
   final CartController cart;
   final AuthController auth;
 
-  const _RightColumn({
-    required this.cart,
-    required this.auth,
-  });
+  const _RightColumn({required this.cart, required this.auth});
 
   @override
   Widget build(BuildContext context) {
@@ -393,7 +408,7 @@ class _RightColumn extends StatelessWidget {
               _InfoRow(label: 'Produtos', value: _format(cart.subtotal)),
               _InfoRow(
                 label: 'Frete',
-                value: _format(toDouble(cart.selectedShipping?['price'])),
+                value: _format(_shippingPrice(cart.selectedShipping)),
               ),
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 12),
@@ -402,7 +417,7 @@ class _RightColumn extends StatelessWidget {
               _InfoRow(
                 label: 'Total',
                 value: _format(
-                  cart.subtotal + toDouble(cart.selectedShipping?['price']),
+                  cart.subtotal + _shippingPrice(cart.selectedShipping),
                 ),
                 bold: true,
               ),
@@ -461,7 +476,7 @@ class _RightColumn extends StatelessWidget {
       final orderId = await orderCtrl.createOrder(
         customerId: auth.user!['ID'],
         pharmacyId: cart.pharmacyId!,
-        addressId: cart.selectedAddress!['ID'],
+        addressId: cart.selectedAddress?['ID'],
         shipping: cart.selectedShipping!,
         subtotal: cart.subtotal,
       );
@@ -470,9 +485,7 @@ class _RightColumn extends StatelessWidget {
 
       if (!context.mounted) return;
       navigator.push(
-        MaterialPageRoute(
-          builder: (_) => PaymentPage(orderId: orderId),
-        ),
+        MaterialPageRoute(builder: (_) => PaymentPage(orderId: orderId)),
       );
     } catch (_) {
       if (!context.mounted) return;
@@ -549,11 +562,7 @@ class _InfoRow extends StatelessWidget {
   final String value;
   final bool bold;
 
-  const _InfoRow({
-    required this.label,
-    required this.value,
-    this.bold = false,
-  });
+  const _InfoRow({required this.label, required this.value, this.bold = false});
 
   @override
   Widget build(BuildContext context) {
@@ -562,10 +571,7 @@ class _InfoRow extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            label,
-            style: const TextStyle(color: AppColors.textLight),
-          ),
+          Text(label, style: const TextStyle(color: AppColors.textLight)),
           Flexible(
             child: Text(
               value,
@@ -584,3 +590,46 @@ class _InfoRow extends StatelessWidget {
 
 String _format(double value) =>
     'R\$ ${value.toStringAsFixed(2).replaceAll('.', ',')}';
+
+double _shippingPrice(Map<String, dynamic>? shipping) {
+  if (shipping == null) return 0;
+  return double.tryParse(shipping['price'].toString()) ?? 0;
+}
+
+String _shippingTitle(Map<String, dynamic>? shipping) {
+  if (shipping == null) return '-';
+
+  final company = shipping['company']?['name']?.toString();
+  final name = shipping['name']?.toString();
+
+  if (company == null || company.isEmpty) {
+    return name ?? 'Entrega';
+  }
+
+  if (name == null || name.isEmpty) {
+    return company;
+  }
+
+  return '$company - $name';
+}
+
+String _shippingSubtitle(Map<String, dynamic>? shipping) {
+  if (shipping == null) return '-';
+
+  final method = shipping['method']?.toString();
+  if (method == 'pickup') {
+    return shipping['description']?.toString() ?? 'Retirada na farmacia.';
+  }
+
+  if (method == 'own_delivery') {
+    return shipping['description']?.toString() ??
+        'Entrega realizada pela farmacia.';
+  }
+
+  final deliveryTime = shipping['delivery_time']?.toString();
+  if (deliveryTime == null || deliveryTime.isEmpty) {
+    return 'Prazo a confirmar';
+  }
+
+  return '$deliveryTime dias';
+}

@@ -41,8 +41,13 @@ class _CategorySectionState extends State<CategorySection> {
     }
 
     return Container(
-      margin: EdgeInsets.fromLTRB(isMobile ? 12 : 24, 0, isMobile ? 12 : 24, 18),
-      padding: EdgeInsets.all(isMobile ? 18 : 24),
+      margin: EdgeInsets.fromLTRB(
+        isMobile ? 12 : 64,
+        0,
+        isMobile ? 12 : 64,
+        18,
+      ),
+      padding: EdgeInsets.all(isMobile ? 18 : 64),
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(28),
@@ -68,7 +73,8 @@ class _CategorySectionState extends State<CategorySection> {
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 itemCount: controller.categories.length,
-                separatorBuilder: (_, __) => SizedBox(width: isMobile ? 12 : 16),
+                separatorBuilder: (_, __) =>
+                    SizedBox(width: isMobile ? 12 : 16),
                 itemBuilder: (_, index) {
                   final category = controller.categories[index];
                   return _CategoryCard(
@@ -129,10 +135,7 @@ class _CategoryCardState extends State<_CategoryCard> {
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [
-                  AppColors.surfaceMuted,
-                  Colors.white,
-                ],
+                colors: [AppColors.surfaceMuted, Colors.white],
               ),
               borderRadius: BorderRadius.circular(24),
               border: Border.all(color: AppColors.border),

@@ -9,7 +9,11 @@ import 'package:SaveMed/core/theme/app_colors.dart';
 import 'package:SaveMed/features/admin/admin_page.dart';
 import 'package:SaveMed/features/auth/auth_page.dart';
 import 'package:SaveMed/features/cart/cart_page.dart';
+import 'package:SaveMed/features/product_detail/product_detail_page.dart';
 import 'package:SaveMed/features/profile/profile_page.dart';
+import 'package:SaveMed/models/inventory_item.dart';
+
+const double _shellMaxWidth = 1180;
 
 class SaveMedHeader extends StatefulWidget {
   const SaveMedHeader({super.key});
@@ -19,17 +23,37 @@ class SaveMedHeader extends StatefulWidget {
 }
 
 class _SaveMedHeaderState extends State<SaveMedHeader> {
+  final LayerLink _searchLayerLink = LayerLink();
+  final GlobalKey _searchFieldKey = GlobalKey();
   OverlayEntry? _overlay;
+  double _searchFieldWidth = 0;
 
   void _showOverlay() {
     if (_overlay != null) return;
 
+    final renderBox =
+        _searchFieldKey.currentContext?.findRenderObject() as RenderBox?;
+    if (renderBox == null) return;
+
+    _searchFieldWidth = renderBox.size.width;
+
     _overlay = OverlayEntry(
-      builder: (context) => Positioned(
-        top: 86,
-        left: 16,
-        right: 16,
-        child: const _SearchOverlay(),
+      builder: (context) => Positioned.fill(
+        child: IgnorePointer(
+          ignoring: false,
+          child: CompositedTransformFollower(
+            link: _searchLayerLink,
+            showWhenUnlinked: false,
+            offset: Offset(0, renderBox.size.height + 8),
+            child: Align(
+              alignment: Alignment.topLeft,
+              child: SizedBox(
+                width: _searchFieldWidth,
+                child: _SearchOverlay(hideOverlay: _hideOverlay),
+              ),
+            ),
+          ),
+        ),
       ),
     );
 
@@ -52,41 +76,55 @@ class _SaveMedHeaderState extends State<SaveMedHeader> {
     final auth = context.watch<AuthController>();
     final isMobile = MediaQuery.of(context).size.width <= 760;
 
-    return Container(
-      margin: EdgeInsets.fromLTRB(isMobile ? 12 : 24, 12, isMobile ? 12 : 24, 12),
-      padding: EdgeInsets.fromLTRB(isMobile ? 16 : 22, 14, isMobile ? 16 : 22, 14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: AppColors.border),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primaryDark.withValues(alpha: 0.06),
-            blurRadius: 18,
-            offset: const Offset(0, 10),
-          ),
-        ],
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        isMobile ? 12 : 64,
+        12,
+        isMobile ? 12 : 64,
+        12,
       ),
-      child: isMobile
-          ? Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _topRow(context, auth),
-                const SizedBox(height: 14),
-                _searchField(),
-                const SizedBox(height: 12),
-                _mobileActions(context, auth),
-              ],
-            )
-          : Row(
-              children: [
-                _brand(context),
-                const SizedBox(width: 24),
-                Expanded(child: _searchField()),
-                const SizedBox(width: 16),
-                _desktopActions(context, auth),
-              ],
-            ),
+      child: Center(
+        child: Container(
+          padding: EdgeInsets.fromLTRB(
+            isMobile ? 16 : 64,
+            14,
+            isMobile ? 16 : 64,
+            14,
+          ),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(28),
+            border: Border.all(color: AppColors.border),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.primaryDark.withValues(alpha: 0.06),
+                blurRadius: 18,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: isMobile
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _topRow(context, auth),
+                    const SizedBox(height: 14),
+                    _searchField(),
+                    const SizedBox(height: 12),
+                    _mobileActions(context, auth),
+                  ],
+                )
+              : Row(
+                  children: [
+                    _brand(context),
+                    const SizedBox(width: 24),
+                    Expanded(child: _searchField()),
+                    const SizedBox(width: 16),
+                    _desktopActions(context, auth),
+                  ],
+                ),
+        ),
+      ),
     );
   }
 
@@ -106,7 +144,9 @@ class _SaveMedHeaderState extends State<SaveMedHeader> {
       children: [
         _cartAction(context),
         const SizedBox(width: 12),
-        auth.isLogged ? _UserMenu(userName: auth.user!['NAME']) : const _LoginButton(),
+        auth.isLogged
+            ? _UserMenu(userName: auth.user!['NAME'])
+            : const _LoginButton(),
       ],
     );
   }
@@ -126,7 +166,9 @@ class _SaveMedHeaderState extends State<SaveMedHeader> {
             ),
           ),
         ),
-        auth.isLogged ? _UserMenu(userName: auth.user!['NAME']) : const _LoginButton(compact: true),
+        auth.isLogged
+            ? _UserMenu(userName: auth.user!['NAME'])
+            : const _LoginButton(compact: true),
       ],
     );
   }
@@ -191,21 +233,27 @@ class _SaveMedHeaderState extends State<SaveMedHeader> {
           }
         });
 
-        return TextField(
-          onChanged: search.search,
-          decoration: InputDecoration(
-            hintText: 'Busque medicamentos, higiene e beleza',
-            prefixIcon: const Icon(Icons.search_rounded),
-            suffixIcon: search.query.isNotEmpty
-                ? IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () {
-                      search.clear();
-                      _hideOverlay();
-                    },
-                  )
-                : null,
-            fillColor: AppColors.background,
+        return CompositedTransformTarget(
+          link: _searchLayerLink,
+          child: Container(
+            key: _searchFieldKey,
+            child: TextField(
+              onChanged: search.search,
+              decoration: InputDecoration(
+                hintText: 'Busque medicamentos, higiene e beleza',
+                prefixIcon: const Icon(Icons.search_rounded),
+                suffixIcon: search.query.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () {
+                          search.clear();
+                          _hideOverlay();
+                        },
+                      )
+                    : null,
+                fillColor: AppColors.background,
+              ),
+            ),
           ),
         );
       },
@@ -238,11 +286,7 @@ class _SaveMedHeaderState extends State<SaveMedHeader> {
                 child: const Icon(Icons.shopping_bag_outlined, size: 22),
               ),
               if (count > 0)
-                Positioned(
-                  top: -4,
-                  right: -4,
-                  child: _CartBadge(count: count),
-                ),
+                Positioned(top: -4, right: -4, child: _CartBadge(count: count)),
             ],
           ),
         );
@@ -252,7 +296,9 @@ class _SaveMedHeaderState extends State<SaveMedHeader> {
 }
 
 class _SearchOverlay extends StatelessWidget {
-  const _SearchOverlay();
+  final VoidCallback hideOverlay;
+
+  const _SearchOverlay({required this.hideOverlay});
 
   @override
   Widget build(BuildContext context) {
@@ -288,40 +334,24 @@ class _SearchOverlay extends StatelessWidget {
                 const SizedBox(height: 8),
                 Expanded(
                   child: ListView(
-                    children: search.products.take(6).map((item) {
-                      final image = item.medication.image;
-
-                      return ListTile(
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 4),
-                        leading: image != null && image.isNotEmpty
-                            ? ClipRRect(
-                                borderRadius: BorderRadius.circular(10),
-                                child: Image.network(
-                                  image,
-                                  width: 42,
-                                  height: 42,
-                                  fit: BoxFit.cover,
+                    children: search.products
+                        .take(6)
+                        .map(
+                          (item) => _SearchResultTile(
+                            item: item,
+                            onSelected: () {
+                              search.clear();
+                              hideOverlay();
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => ProductDetailPage(item: item),
                                 ),
-                              )
-                            : Container(
-                                width: 42,
-                                height: 42,
-                                decoration: BoxDecoration(
-                                  color: AppColors.surfaceMuted,
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: const Icon(Icons.medication_outlined),
-                              ),
-                        title: Text(
-                          item.medication.name,
-                          style: const TextStyle(fontWeight: FontWeight.w600),
-                        ),
-                        subtitle: Text(
-                          'R\$ ${item.price.toStringAsFixed(2).replaceAll('.', ',')}',
-                        ),
-                        onTap: () {},
-                      );
-                    }).toList(),
+                              );
+                            },
+                          ),
+                        )
+                        .toList(),
                   ),
                 ),
               ],
@@ -329,6 +359,53 @@ class _SearchOverlay extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+class _SearchResultTile extends StatelessWidget {
+  final InventoryItem item;
+  final VoidCallback onSelected;
+
+  const _SearchResultTile({required this.item, required this.onSelected});
+
+  @override
+  Widget build(BuildContext context) {
+    final image = item.medication.image;
+
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+      leading: image != null && image.isNotEmpty
+          ? ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: Image.network(
+                image,
+                width: 42,
+                height: 42,
+                fit: BoxFit.cover,
+              ),
+            )
+          : Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: AppColors.surfaceMuted,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.medication_outlined),
+            ),
+      title: Text(
+        item.medication.name,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(fontWeight: FontWeight.w600),
+      ),
+      subtitle: Text(
+        'R\$ ${item.price.toStringAsFixed(2).replaceAll('.', ',')}',
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+      onTap: onSelected,
     );
   }
 }

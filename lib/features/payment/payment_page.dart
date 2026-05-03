@@ -63,7 +63,9 @@ class _PaymentPageState extends State<PaymentPage> {
     final cartController = context.read<CartController>();
 
     _pixPollingTimer?.cancel();
-    _pixPollingTimer = Timer.periodic(const Duration(seconds: 5), (timer) async {
+    _pixPollingTimer = Timer.periodic(const Duration(seconds: 5), (
+      timer,
+    ) async {
       final status = await paymentCtrl.checkStatus(orderId: widget.orderId);
 
       if (status == 'paid') {
@@ -228,28 +230,28 @@ class _PaymentPageState extends State<PaymentPage> {
           const SizedBox(height: 18),
         ],
         if (_method == PaymentMethod.pix) ...[
-          _PixPanel(
-            pixGenerated: _pixGenerated,
-            pixQrCode: _pixQrCode,
-          ),
+          _PixPanel(pixGenerated: _pixGenerated, pixQrCode: _pixQrCode),
           const SizedBox(height: 18),
         ],
         SaveMedButton(
-          icon: _method == PaymentMethod.pix ? Icons.qr_code : Icons.lock_outline,
+          icon: _method == PaymentMethod.pix
+              ? Icons.qr_code
+              : Icons.lock_outline,
           label: _method == PaymentMethod.pix ? 'Gerar Pix' : 'Pagar agora',
           loading: paymentCtrl.loading,
-          onPressed: paymentCtrl.loading ||
+          onPressed:
+              paymentCtrl.loading ||
                   (_usesCard && cardCtrl.selected == null) ||
                   (_method == PaymentMethod.pix && _pixGenerated)
               ? null
               : () => _handlePayment(
-                    context,
-                    auth: auth,
-                    cart: cart,
-                    cardCtrl: cardCtrl,
-                    paymentCtrl: paymentCtrl,
-                    total: total,
-                  ),
+                  context,
+                  auth: auth,
+                  cart: cart,
+                  cardCtrl: cardCtrl,
+                  paymentCtrl: paymentCtrl,
+                  total: total,
+                ),
         ),
       ],
     );
@@ -284,14 +286,16 @@ class _PaymentPageState extends State<PaymentPage> {
         'email': auth.user?['EMAIL'],
         'document': auth.user?['CPF'],
         'phone': auth.user?['PHONE_NUMBER'],
-        'address': {
-          'zip_code': cart.selectedAddress!['CEP'],
-          'city': cart.selectedAddress!['CITY'],
-          'state': cart.selectedAddress!['STATE'],
-          'line_1':
-              '${cart.selectedAddress!['STREET']}, ${cart.selectedAddress!['NUMBER']}',
-          'country': 'BR',
-        },
+        'address': cart.selectedAddress == null
+            ? null
+            : {
+                'zip_code': cart.selectedAddress!['CEP'],
+                'city': cart.selectedAddress!['CITY'],
+                'state': cart.selectedAddress!['STATE'],
+                'line_1':
+                    '${cart.selectedAddress!['STREET']}, ${cart.selectedAddress!['NUMBER']}',
+                'country': 'BR',
+              },
       },
       deviceId: 'web-device',
     );
@@ -318,8 +322,7 @@ class _PaymentPageState extends State<PaymentPage> {
     }
 
     final message =
-        result['message'] ??
-        'Pagamento nao autorizado. Tente outro metodo.';
+        result['message'] ?? 'Pagamento nao autorizado. Tente outro metodo.';
 
     messenger.showSnackBar(
       SnackBar(
@@ -335,10 +338,7 @@ class _PaymentHero extends StatelessWidget {
   final double total;
   final int orderId;
 
-  const _PaymentHero({
-    required this.total,
-    required this.orderId,
-  });
+  const _PaymentHero({required this.total, required this.orderId});
 
   @override
   Widget build(BuildContext context) {
@@ -486,10 +486,7 @@ class _PaymentSidebar extends StatelessWidget {
                 label: 'Frete',
                 value: _format(_shippingPrice(cart.selectedShipping)),
               ),
-              _SummaryRow(
-                label: 'Metodo',
-                value: method.name.toUpperCase(),
-              ),
+              _SummaryRow(label: 'Metodo', value: method.name.toUpperCase()),
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 12),
                 child: Divider(height: 1, color: AppColors.border),
@@ -519,12 +516,14 @@ class _PaymentSidebar extends StatelessWidget {
               SizedBox(height: 12),
               _SecurityItem(
                 icon: Icons.qr_code_2_outlined,
-                text: 'Pix fica disponivel com copia e cola e verificacao de status.',
+                text:
+                    'Pix fica disponivel com copia e cola e verificacao de status.',
               ),
               SizedBox(height: 12),
               _SecurityItem(
                 icon: Icons.local_shipping_outlined,
-                text: 'O pedido permanece associado ao endereco e frete selecionados.',
+                text:
+                    'O pedido permanece associado ao endereco e frete selecionados.',
               ),
             ],
           ),
@@ -538,10 +537,7 @@ class _SecurityItem extends StatelessWidget {
   final IconData icon;
   final String text;
 
-  const _SecurityItem({
-    required this.icon,
-    required this.text,
-  });
+  const _SecurityItem({required this.icon, required this.text});
 
   @override
   Widget build(BuildContext context) {
@@ -626,7 +622,9 @@ class _CardSelectionPanel extends StatelessWidget {
                           selected
                               ? Icons.check_circle
                               : Icons.credit_card_outlined,
-                          color: selected ? AppColors.primaryDark : AppColors.primary,
+                          color: selected
+                              ? AppColors.primaryDark
+                              : AppColors.primary,
                         ),
                         const SizedBox(width: 12),
                         Expanded(
@@ -663,10 +661,7 @@ class _PixPanel extends StatelessWidget {
   final bool pixGenerated;
   final String? pixQrCode;
 
-  const _PixPanel({
-    required this.pixGenerated,
-    required this.pixQrCode,
-  });
+  const _PixPanel({required this.pixGenerated, required this.pixQrCode});
 
   @override
   Widget build(BuildContext context) {
@@ -767,10 +762,7 @@ class _SummaryRow extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            label,
-            style: const TextStyle(color: AppColors.textLight),
-          ),
+          Text(label, style: const TextStyle(color: AppColors.textLight)),
           Text(
             value,
             style: TextStyle(

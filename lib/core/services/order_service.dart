@@ -6,8 +6,10 @@ class OrderService {
   Future<int> createOrder({
     required int customerId,
     required int pharmacyId,
-    required int addressId,
+    int? addressId,
     required double shippingPrice,
+    required String deliveryMethod,
+    String? deliveryLabel,
     required double subtotal,
     required double total,
   }) async {
@@ -16,6 +18,8 @@ class OrderService {
       'PHARMACY_ID': pharmacyId,
       'ADDRESS_ID': addressId,
       'SHIPPING_PRICE': shippingPrice,
+      'DELIVERY_METHOD': deliveryMethod,
+      'DELIVERY_LABEL': deliveryLabel,
       'SUBTOTAL': subtotal,
       'TOTAL_AMOUNT': total,
     });
