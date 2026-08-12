@@ -1,7 +1,6 @@
-import 'dart:convert';
-
 import '../../models/inventory_item.dart';
 import '../api/api_client.dart';
+import '../api/api_response.dart';
 
 class InventoryService {
   Future<List<InventoryItem>> getInventory({
@@ -19,15 +18,19 @@ class InventoryService {
         if (order != null) 'order': order,
         if (categoryId != null) 'category_id': '$categoryId',
         if (subcategoryId != null) 'subcategory_id': '$subcategoryId',
+        if (minPrice != null) 'min_price': '$minPrice',
+        if (maxPrice != null) 'max_price': '$maxPrice',
+        if (onlyAvailable == true) 'only_available': 'true',
       },
     );
-
-    if (response.statusCode != 200) {
-      throw Exception('Erro ao buscar inventory');
-    }
-
-    final data = jsonDecode(response.body) as List;
-
-    return data.map((e) => InventoryItem.fromJson(e)).toList();
+    final data = ApiResponse.list(
+      response,
+      expectedStatusCodes: {200},
+      fallback: 'Erro ao buscar inventario',
+    );
+    return data
+        .whereType<Map<String, dynamic>>()
+        .map(InventoryItem.fromJson)
+        .toList();
   }
 }

@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:SaveMed/core/controllers/cart_controller.dart';
-import 'package:SaveMed/core/widgets/confirm_clear_cart_dialog.dart';
-import 'package:SaveMed/core/widgets/savemed_header.dart';
-import 'package:SaveMed/core/widgets/savemed_footer.dart';
-import 'package:SaveMed/features/cart/cart_page.dart';
+import 'package:savemed/core/controllers/cart_controller.dart';
+import 'package:savemed/core/widgets/confirm_clear_cart_dialog.dart';
+import 'package:savemed/core/widgets/savemed_header.dart';
+import 'package:savemed/core/widgets/savemed_footer.dart';
+import 'package:savemed/features/cart/cart_page.dart';
 import '../../models/inventory_item.dart';
 
 class ProductDetailPage extends StatelessWidget {
@@ -203,6 +203,8 @@ class ProductDetailPage extends StatelessWidget {
                   }
 
                   cart.addItem(item);
+
+                  if (!context.mounted) return;
 
                   Navigator.push(
                     context,

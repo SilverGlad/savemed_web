@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import 'package:SaveMed/core/controllers/address_controller.dart';
-import 'package:SaveMed/core/controllers/cart_controller.dart';
-import 'package:SaveMed/core/controllers/pharmacy_controller.dart';
-import 'package:SaveMed/core/theme/app_colors.dart';
-import 'package:SaveMed/core/widgets/address_modal.dart';
-import 'package:SaveMed/core/widgets/savemed_button.dart';
-import 'package:SaveMed/features/checkout/checkout_page.dart';
+import 'package:savemed/core/controllers/address_controller.dart';
+import 'package:savemed/core/controllers/cart_controller.dart';
+import 'package:savemed/core/controllers/pharmacy_controller.dart';
+import 'package:savemed/core/theme/app_colors.dart';
+import 'package:savemed/core/widgets/address_modal.dart';
+import 'package:savemed/core/widgets/savemed_button.dart';
+import 'package:savemed/features/checkout/checkout_page.dart';
 
 class CartSummaryCard extends StatefulWidget {
   const CartSummaryCard({super.key});

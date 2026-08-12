@@ -1,7 +1,7 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:SaveMed/features/product_list/product_list_page.dart';
+import 'package:savemed/features/product_list/product_list_page.dart';
 
 import '../controllers/category_controller.dart';
 import '../theme/app_colors.dart';

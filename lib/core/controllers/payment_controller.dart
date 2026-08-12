@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:SaveMed/features/payment/payment_page.dart';
+import 'package:savemed/features/payment/payment_page.dart';
 import '../services/payment_service.dart';
 
 class PaymentController extends ChangeNotifier {

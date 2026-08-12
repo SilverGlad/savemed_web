@@ -1,4 +1,4 @@
-import 'package:SaveMed/models/subcategory.dart';
+import 'package:savemed/models/subcategory.dart';
 
 class Category {
   final int id;

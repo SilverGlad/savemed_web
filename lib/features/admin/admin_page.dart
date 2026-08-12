@@ -1,1160 +1,530 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:SaveMed/core/controllers/auth_controller.dart';
-import 'package:SaveMed/core/services/admin_service.dart';
-import 'package:SaveMed/core/theme/app_colors.dart';
-import 'package:SaveMed/core/widgets/savemed_footer.dart';
-import 'package:SaveMed/core/widgets/savemed_header.dart';
+import 'package:savemed/core/auth/user_role.dart';
+import 'package:savemed/core/controllers/auth_controller.dart';
+import 'package:savemed/core/domain/order_status.dart';
+import 'package:savemed/core/services/admin_service.dart';
+import 'package:savemed/core/theme/app_colors.dart';
+import 'package:savemed/core/utils/document_validator.dart';
+import 'package:savemed/core/utils/field_validators.dart';
+import 'package:savemed/core/utils/input_formatters.dart';
+import 'package:savemed/features/auth/auth_page.dart';
+import 'package:savemed/features/admin/domain/order_status_rules.dart';
 
-class AdminPage extends StatelessWidget {
+part 'sections/admin_overview.dart';
+part 'sections/admin_list_base.dart';
+part 'sections/admin_pharmacies.dart';
+part 'sections/admin_users.dart';
+part 'sections/admin_categories.dart';
+part 'sections/admin_medications.dart';
+part 'sections/admin_inventory.dart';
+part 'sections/admin_promotions.dart';
+part 'sections/admin_orders.dart';
+part 'sections/admin_widgets.dart';
+
+enum _AdminSection {
+  overview,
+  pharmacies,
+  categories,
+  medications,
+  inventory,
+  promotions,
+  orders,
+}
+
+class AdminPage extends StatefulWidget {
   const AdminPage({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final user = context.watch<AuthController>().user ?? {};
-    final role = user['USER_ROLE']?.toString() ?? '';
-    final pharmacyId = user['PHARMACY_ID'] as int?;
-    final isAppAdmin = role == 'app_admin';
-
-    final tabs = <Tab>[
-      const Tab(text: 'Farmacias'),
-      const Tab(text: 'Solicitacoes'),
-      const Tab(text: 'Categorias'),
-      const Tab(text: 'Medicamentos'),
-      const Tab(text: 'Inventario'),
-      const Tab(text: 'Pedidos'),
-    ];
-
-    final views = <Widget>[
-      _PharmaciesTab(
-        pharmacyId: isAppAdmin ? null : pharmacyId,
-        canCreate: isAppAdmin,
-      ),
-      _AccessRequestsTab(pharmacyId: isAppAdmin ? null : pharmacyId),
-      _CategoriesTab(pharmacyId: isAppAdmin ? null : pharmacyId),
-      _MedicationsTab(pharmacyId: isAppAdmin ? null : pharmacyId),
-      _InventoryTab(pharmacyId: isAppAdmin ? null : pharmacyId),
-      _OrdersTab(pharmacyId: isAppAdmin ? null : pharmacyId),
-    ];
-
-    return DefaultTabController(
-      length: tabs.length,
-      child: Scaffold(
-        backgroundColor: AppColors.background,
-        body: Column(
-          children: [
-            SaveMedHeader(),
-            Expanded(
-              child: Column(
-                children: [
-                  const Padding(
-                    padding: EdgeInsets.fromLTRB(16, 16, 16, 0),
-                    child: _AdminHero(),
-                  ),
-                  Container(
-                    margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(24),
-                      border: Border.all(color: AppColors.border),
-                    ),
-                    child: TabBar(
-                      isScrollable: true,
-                      indicator: BoxDecoration(
-                        color: AppColors.primary,
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      dividerColor: Colors.transparent,
-                      labelColor: Colors.white,
-                      unselectedLabelColor: AppColors.textLight,
-                      tabs: tabs,
-                    ),
-                  ),
-                  Expanded(child: TabBarView(children: views)),
-                ],
-              ),
-            ),
-            const SaveMedFooter(),
-          ],
-        ),
-      ),
-    );
-  }
+  State<AdminPage> createState() => _AdminPageState();
 }
 
-class _AdminHero extends StatelessWidget {
-  const _AdminHero();
+class _AdminPageState extends State<AdminPage> {
+  _AdminSection _section = _AdminSection.overview;
 
   @override
   Widget build(BuildContext context) {
-    final user = context.watch<AuthController>().user ?? {};
-    final role = user['USER_ROLE']?.toString() ?? '';
-    final isAppAdmin = role == 'app_admin';
-    final theme = Theme.of(context);
+    final auth = context.watch<AuthController>();
+    final user = auth.user ?? {};
+    final role = auth.role;
+    final pharmacyId = user['PHARMACY_ID'] as int?;
+    final isAppAdmin = role == UserRole.appAdmin;
+    final isPharmacyAdmin = role == UserRole.pharmacyAdmin;
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(22),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(28),
-        gradient: const LinearGradient(
-          colors: [Color(0xFF132F2A), Color(0xFF165F4F), Color(0xFF1D9B7D)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
-      child: Wrap(
-        runSpacing: 16,
-        spacing: 16,
-        alignment: WrapAlignment.spaceBetween,
-        children: [
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 620),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Text(
-                    isAppAdmin ? 'Painel geral SaveMed' : 'Painel da farmacia',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 14),
-                Text(
-                  'Gerencie catalogo, estoque e pedidos com foco operacional.',
-                  style: theme.textTheme.headlineMedium?.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w800,
-                    height: 1.05,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  isAppAdmin
-                      ? 'Acompanhe toda a rede, edite entidades centrais e trate pedidos com estorno.'
-                      : 'Atualize dados da sua farmacia, ajuste produtos e acompanhe pedidos em andamento.',
-                  style: theme.textTheme.bodyLarge?.copyWith(
-                    color: Colors.white.withValues(alpha: 0.82),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: [
-              _HeroBadge(
-                icon: Icons.storefront_outlined,
-                label: 'Escopo',
-                value: isAppAdmin ? 'Plataforma' : 'Farmacia',
-              ),
-              const _HeroBadge(
-                icon: Icons.tune_outlined,
-                label: 'Acoes',
-                value: 'CRUD + pedidos',
-              ),
-              const _HeroBadge(
-                icon: Icons.sync_alt_outlined,
-                label: 'Fluxo',
-                value: 'Operacao diaria',
-              ),
-            ],
-          ),
-        ],
+    if (!isAppAdmin && !isPharmacyAdmin) {
+      return const Scaffold(
+        backgroundColor: _AdminColors.background,
+        body: Center(child: _AdminAccessDenied()),
+      );
+    }
+
+    final sections = _sectionsFor(isAppAdmin);
+    if (!sections.any((item) => item.section == _section)) {
+      _section = _AdminSection.overview;
+    }
+
+    return _AdminShell(
+      user: user,
+      sections: sections,
+      selected: _section,
+      onSelected: (section) => setState(() => _section = section),
+      child: _AdminContent(
+        section: _section,
+        pharmacyId: isAppAdmin ? null : pharmacyId,
+        isAppAdmin: isAppAdmin,
       ),
     );
   }
 }
 
-class _HeroBadge extends StatelessWidget {
+List<_AdminNavItem> _sectionsFor(bool isAppAdmin) {
+  return [
+    const _AdminNavItem(
+      section: _AdminSection.overview,
+      icon: Icons.dashboard_outlined,
+      label: 'Visao geral',
+    ),
+    _AdminNavItem(
+      section: _AdminSection.pharmacies,
+      icon: Icons.storefront_outlined,
+      label: isAppAdmin ? 'Farmacias' : 'Minha loja',
+    ),
+    const _AdminNavItem(
+      section: _AdminSection.categories,
+      icon: Icons.category_outlined,
+      label: 'Categorias',
+    ),
+    const _AdminNavItem(
+      section: _AdminSection.medications,
+      icon: Icons.medication_outlined,
+      label: 'Produtos',
+    ),
+    _AdminNavItem(
+      section: _AdminSection.inventory,
+      icon: Icons.inventory_2_outlined,
+      label: isAppAdmin ? 'Inventario' : 'Estoque',
+    ),
+    const _AdminNavItem(
+      section: _AdminSection.promotions,
+      icon: Icons.local_offer_outlined,
+      label: 'Promocoes',
+    ),
+    const _AdminNavItem(
+      section: _AdminSection.orders,
+      icon: Icons.receipt_long_outlined,
+      label: 'Pedidos',
+    ),
+  ];
+}
+
+class _AdminNavItem {
+  final _AdminSection section;
   final IconData icon;
   final String label;
-  final String value;
 
-  const _HeroBadge({
+  const _AdminNavItem({
+    required this.section,
     required this.icon,
     required this.label,
-    required this.value,
+  });
+}
+
+class _AdminColors {
+  static const background = Color(0xFFF5F7F8);
+  static const sidebar = Color(0xFF102924);
+  static const sidebarMuted = Color(0xFF8FB5AD);
+  static const line = Color(0xFFE1E7EA);
+  static const muted = Color(0xFF687A80);
+  static const text = Color(0xFF172B31);
+}
+
+class _AdminShell extends StatelessWidget {
+  final Map<String, dynamic> user;
+  final List<_AdminNavItem> sections;
+  final _AdminSection selected;
+  final ValueChanged<_AdminSection> onSelected;
+  final Widget child;
+
+  const _AdminShell({
+    required this.user,
+    required this.sections,
+    required this.selected,
+    required this.onSelected,
+    required this.child,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 144,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, color: Colors.white, size: 18),
-          const SizedBox(height: 10),
-          Text(
-            label,
-            style: const TextStyle(
-              color: Colors.white70,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-            ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final desktop = constraints.maxWidth >= 980;
+        final sidebar = _AdminSidebar(
+          user: user,
+          sections: sections,
+          selected: selected,
+          onSelected: onSelected,
+          closeDrawerOnTap: !desktop,
+        );
+
+        return Scaffold(
+          backgroundColor: _AdminColors.background,
+          drawer: desktop ? null : Drawer(width: 280, child: sidebar),
+          body: Row(
+            children: [
+              if (desktop) SizedBox(width: 272, child: sidebar),
+              Expanded(
+                child: Column(
+                  children: [
+                    _AdminTopBar(user: user, selected: selected),
+                    Expanded(child: child),
+                  ],
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
 
-abstract class _AdminListState<T extends StatefulWidget> extends State<T> {
-  final AdminService service = AdminService();
-  bool loading = true;
-  String? error;
-  List<dynamic> items = [];
+class _AdminSidebar extends StatelessWidget {
+  final Map<String, dynamic> user;
+  final List<_AdminNavItem> sections;
+  final _AdminSection selected;
+  final ValueChanged<_AdminSection> onSelected;
+  final bool closeDrawerOnTap;
 
-  Future<void> reload();
+  const _AdminSidebar({
+    required this.user,
+    required this.sections,
+    required this.selected,
+    required this.onSelected,
+    required this.closeDrawerOnTap,
+  });
 
-  Future<void> handle(Future<void> Function() action) async {
-    setState(() => error = null);
-    try {
-      await action();
-      await reload();
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => error = e.toString());
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(e.toString())));
-    }
-  }
+  @override
+  Widget build(BuildContext context) {
+    final role = UserRole.fromApi(user['USER_ROLE']) == UserRole.appAdmin
+        ? 'Admin SaveMed'
+        : 'Portal da farmacia';
 
-  Widget buildScaffold({
-    required String title,
-    required String description,
-    required VoidCallback onCreate,
-    required Widget child,
-    String createLabel = 'Novo',
-  }) {
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Wrap(
-            runSpacing: 14,
-            alignment: WrapAlignment.spaceBetween,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 640),
+    return Container(
+      color: _AdminColors.sidebar,
+      child: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 18, 18, 14),
+              child: Row(
+                children: [
+                  Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(
+                      Icons.local_pharmacy_outlined,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Text(
+                      'SaveMed',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 0, 18, 16),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.06),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.08),
+                  ),
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      title,
+                      role,
                       style: const TextStyle(
-                        fontSize: 24,
+                        color: Colors.white,
                         fontWeight: FontWeight.w800,
-                        color: AppColors.textDark,
                       ),
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 4),
                     Text(
-                      description,
-                      style: const TextStyle(color: AppColors.textLight),
+                      user['EMAIL']?.toString() ?? '',
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: _AdminColors.sidebarMuted,
+                        fontSize: 12,
+                      ),
                     ),
                   ],
                 ),
               ),
-              FilledButton.icon(
-                onPressed: onCreate,
-                style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.primary,
+            ),
+            Expanded(
+              child: ListView.separated(
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                itemCount: sections.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 2),
+                itemBuilder: (context, index) {
+                  final item = sections[index];
+                  final active = item.section == selected;
+                  return _SidebarButton(
+                    item: item,
+                    active: active,
+                    onTap: () {
+                      onSelected(item.section);
+                      if (closeDrawerOnTap) Navigator.of(context).pop();
+                    },
+                  );
+                },
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(10),
+              child: OutlinedButton.icon(
+                onPressed: () async {
+                  await context.read<AuthController>().logout();
+                  if (!context.mounted) return;
+                  Navigator.of(context).pushAndRemoveUntil(
+                    MaterialPageRoute(builder: (_) => const AuthPage()),
+                    (_) => false,
+                  );
+                },
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.white,
+                  side: BorderSide(color: Colors.white.withValues(alpha: 0.18)),
+                  minimumSize: const Size.fromHeight(42),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(18),
-                  ),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 18,
-                    vertical: 16,
+                    borderRadius: BorderRadius.circular(8),
                   ),
                 ),
-                icon: const Icon(Icons.add),
-                label: Text(createLabel),
-              ),
-            ],
-          ),
-          if (error != null) ...[
-            const SizedBox(height: 12),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: AppColors.danger.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(18),
-              ),
-              child: Text(
-                error!,
-                style: const TextStyle(
-                  color: AppColors.danger,
-                  fontWeight: FontWeight.w600,
-                ),
+                icon: const Icon(Icons.logout, size: 18),
+                label: const Text('Sair'),
               ),
             ),
           ],
-          const SizedBox(height: 16),
+        ),
+      ),
+    );
+  }
+}
+
+class _SidebarButton extends StatelessWidget {
+  final _AdminNavItem item;
+  final bool active;
+  final VoidCallback onTap;
+
+  const _SidebarButton({
+    required this.item,
+    required this.active,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: active ? Colors.white.withValues(alpha: 0.12) : Colors.transparent,
+      borderRadius: BorderRadius.circular(8),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+          child: Row(
+            children: [
+              Icon(
+                item.icon,
+                size: 19,
+                color: active ? Colors.white : _AdminColors.sidebarMuted,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  item.label,
+                  style: TextStyle(
+                    color: active ? Colors.white : _AdminColors.sidebarMuted,
+                    fontWeight: active ? FontWeight.w800 : FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AdminTopBar extends StatelessWidget {
+  final Map<String, dynamic> user;
+  final _AdminSection selected;
+
+  const _AdminTopBar({required this.user, required this.selected});
+
+  @override
+  Widget build(BuildContext context) {
+    final title = _titleFor(
+      selected,
+      UserRole.fromApi(user['USER_ROLE']) == UserRole.appAdmin,
+    );
+
+    return Container(
+      height: 64,
+      padding: const EdgeInsets.symmetric(horizontal: 18),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(bottom: BorderSide(color: _AdminColors.line)),
+      ),
+      child: Row(
+        children: [
+          Builder(
+            builder: (context) => IconButton(
+              onPressed: Scaffold.maybeOf(context)?.openDrawer,
+              icon: const Icon(Icons.menu),
+            ),
+          ),
+          const SizedBox(width: 4),
           Expanded(
-            child: loading
-                ? const Center(child: CircularProgressIndicator())
-                : child,
+            child: Text(
+              title,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: _AdminColors.text,
+                fontSize: 18,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
           ),
+          const SizedBox(width: 12),
+          _RolePill(role: UserRole.fromApi(user['USER_ROLE'])),
         ],
       ),
     );
   }
 }
 
-class _PharmaciesTab extends StatefulWidget {
-  final int? pharmacyId;
-  final bool canCreate;
+class _RolePill extends StatelessWidget {
+  final UserRole role;
 
-  const _PharmaciesTab({this.pharmacyId, required this.canCreate});
-
-  @override
-  State<_PharmaciesTab> createState() => _PharmaciesTabState();
-}
-
-class _PharmaciesTabState extends _AdminListState<_PharmaciesTab> {
-  @override
-  void initState() {
-    super.initState();
-    reload();
-  }
-
-  @override
-  Future<void> reload() async {
-    setState(() => loading = true);
-    try {
-      final pharmacies = await service.listPharmacies();
-      items = widget.pharmacyId == null
-          ? pharmacies
-          : pharmacies
-                .where((item) => item['ID'] == widget.pharmacyId)
-                .toList();
-    } catch (e) {
-      error = e.toString();
-    }
-    if (!mounted) return;
-    setState(() => loading = false);
-  }
+  const _RolePill({required this.role});
 
   @override
   Widget build(BuildContext context) {
-    final canCreate = widget.canCreate && widget.pharmacyId == null;
-
-    return buildScaffold(
-      title: 'Farmacias',
-      description:
-          'Visualize unidades cadastradas e mantenha os dados operacionais atualizados.',
-      onCreate: canCreate ? () => _showPharmacyDialog() : reload,
-      createLabel: canCreate ? 'Nova' : 'Atualizar',
-      child: ListView.separated(
-        itemCount: items.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 12),
-        itemBuilder: (_, index) {
-          final pharmacy = items[index] as Map<String, dynamic>;
-          return Card(
-            child: ListTile(
-              title: Text(pharmacy['NAME']?.toString() ?? 'Farmacia'),
-              subtitle: Text(
-                [
-                  pharmacy['CITY'],
-                  pharmacy['STATE'],
-                  pharmacy['ZIPCODE'],
-                ].whereType<String>().where((e) => e.isNotEmpty).join(' • '),
-              ),
-              trailing: Wrap(
-                spacing: 8,
-                children: [
-                  IconButton(
-                    onPressed: () => _showPharmacyDialog(pharmacy: pharmacy),
-                    icon: const Icon(Icons.edit),
-                  ),
-                  if (widget.canCreate)
-                    IconButton(
-                      onPressed: () => handle(
-                        () => service.deletePharmacy(pharmacy['ID'] as int),
-                      ),
-                      icon: const Icon(Icons.delete),
-                    ),
-                ],
-              ),
-            ),
-          );
-        },
+    final label = role == UserRole.appAdmin ? 'Admin geral' : 'Farmacia';
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(999),
       ),
-    );
-  }
-
-  Future<void> _showPharmacyDialog({Map<String, dynamic>? pharmacy}) async {
-    final name = TextEditingController(
-      text: pharmacy?['NAME']?.toString() ?? '',
-    );
-    final phone = TextEditingController(
-      text: pharmacy?['PHONE']?.toString() ?? '',
-    );
-    final city = TextEditingController(
-      text: pharmacy?['CITY']?.toString() ?? '',
-    );
-    final stateCtrl = TextEditingController(
-      text: pharmacy?['STATE']?.toString() ?? '',
-    );
-    final zip = TextEditingController(
-      text: pharmacy?['ZIPCODE']?.toString() ?? '',
-    );
-    final ownDeliveryPrice = TextEditingController(
-      text: pharmacy?['OWN_DELIVERY_PRICE']?.toString() ?? '',
-    );
-    final ownDeliveryPricePerKm = TextEditingController(
-      text: pharmacy?['OWN_DELIVERY_PRICE_PER_KM']?.toString() ?? '',
-    );
-    final ownDeliveryMaxDistanceKm = TextEditingController(
-      text: pharmacy?['OWN_DELIVERY_MAX_DISTANCE_KM']?.toString() ?? '',
-    );
-    final ownDeliveryNote = TextEditingController(
-      text: pharmacy?['OWN_DELIVERY_NOTE']?.toString() ?? '',
-    );
-    var acceptsOwnDelivery = pharmacy?['ACCEPTS_OWN_DELIVERY'] == true;
-    var acceptsPickup = pharmacy?['ACCEPTS_PICKUP'] == true;
-
-    await showDialog<void>(
-      context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setModalState) => AlertDialog(
-          title: Text(pharmacy == null ? 'Nova farmacia' : 'Editar farmacia'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _input(name, 'Nome'),
-                _input(phone, 'Telefone'),
-                _input(city, 'Cidade'),
-                _input(stateCtrl, 'Estado'),
-                _input(zip, 'CEP'),
-                SwitchListTile(
-                  value: acceptsOwnDelivery,
-                  title: const Text('Entrega propria'),
-                  subtitle: const Text(
-                    'Entrega calculada por distancia conforme a configuracao.',
-                  ),
-                  contentPadding: EdgeInsets.zero,
-                  onChanged: (value) {
-                    setModalState(() => acceptsOwnDelivery = value);
-                  },
-                ),
-                if (acceptsOwnDelivery) ...[
-                  _input(ownDeliveryPrice, 'Valor base da entrega'),
-                  _input(ownDeliveryPricePerKm, 'Valor por km'),
-                  _input(ownDeliveryMaxDistanceKm, 'Raio maximo em km'),
-                  _input(ownDeliveryNote, 'Observacoes da entrega'),
-                ],
-                SwitchListTile(
-                  value: acceptsPickup,
-                  title: const Text('Retirada no local'),
-                  subtitle: const Text(
-                    'Cliente pode retirar direto na farmacia.',
-                  ),
-                  contentPadding: EdgeInsets.zero,
-                  onChanged: (value) {
-                    setModalState(() => acceptsPickup = value);
-                  },
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('Cancelar'),
-            ),
-            FilledButton(
-              onPressed: () async {
-                Navigator.pop(dialogContext);
-                await handle(
-                  () => service.savePharmacy({
-                    'NAME': name.text,
-                    'PHONE': phone.text,
-                    'CITY': city.text,
-                    'STATE': stateCtrl.text,
-                    'ZIPCODE': zip.text,
-                    'ACCEPTS_OWN_DELIVERY': acceptsOwnDelivery,
-                    'ACCEPTS_PICKUP': acceptsPickup,
-                    'OWN_DELIVERY_PRICE': acceptsOwnDelivery
-                        ? double.tryParse(
-                            ownDeliveryPrice.text.trim().replaceAll(',', '.'),
-                          )
-                        : null,
-                    'OWN_DELIVERY_PRICE_PER_KM': acceptsOwnDelivery
-                        ? double.tryParse(
-                            ownDeliveryPricePerKm.text.trim().replaceAll(
-                              ',',
-                              '.',
-                            ),
-                          )
-                        : null,
-                    'OWN_DELIVERY_MAX_DISTANCE_KM': acceptsOwnDelivery
-                        ? double.tryParse(
-                            ownDeliveryMaxDistanceKm.text.trim().replaceAll(
-                              ',',
-                              '.',
-                            ),
-                          )
-                        : null,
-                    'OWN_DELIVERY_NOTE':
-                        acceptsOwnDelivery &&
-                            ownDeliveryNote.text.trim().isNotEmpty
-                        ? ownDeliveryNote.text.trim()
-                        : null,
-                  }, id: pharmacy?['ID'] as int?),
-                );
-              },
-              child: const Text('Salvar'),
-            ),
-          ],
+      child: Text(
+        label,
+        style: const TextStyle(
+          color: AppColors.primaryDark,
+          fontSize: 12,
+          fontWeight: FontWeight.w800,
         ),
       ),
     );
   }
 }
 
-class _CategoriesTab extends StatefulWidget {
-  final int? pharmacyId;
-
-  const _CategoriesTab({required this.pharmacyId});
-
-  @override
-  State<_CategoriesTab> createState() => _CategoriesTabState();
+String _titleFor(_AdminSection section, bool isAppAdmin) {
+  return switch (section) {
+    _AdminSection.overview =>
+      isAppAdmin ? 'Visao geral SaveMed' : 'Visao geral da loja',
+    _AdminSection.pharmacies => isAppAdmin ? 'Farmacias' : 'Minha loja',
+    _AdminSection.categories => 'Categorias',
+    _AdminSection.medications => 'Produtos',
+    _AdminSection.inventory => isAppAdmin ? 'Inventario' : 'Estoque',
+    _AdminSection.promotions => 'Promocoes',
+    _AdminSection.orders => 'Pedidos',
+  };
 }
 
-class _AccessRequestsTab extends StatefulWidget {
+class _AdminContent extends StatelessWidget {
+  final _AdminSection section;
   final int? pharmacyId;
+  final bool isAppAdmin;
 
-  const _AccessRequestsTab({required this.pharmacyId});
-
-  @override
-  State<_AccessRequestsTab> createState() => _AccessRequestsTabState();
-}
-
-class _AccessRequestsTabState extends _AdminListState<_AccessRequestsTab> {
-  @override
-  void initState() {
-    super.initState();
-    reload();
-  }
-
-  @override
-  Future<void> reload() async {
-    setState(() => loading = true);
-    try {
-      items = await service.listAccessRequests(pharmacyId: widget.pharmacyId);
-    } catch (e) {
-      error = e.toString();
-    }
-    if (!mounted) return;
-    setState(() => loading = false);
-  }
+  const _AdminContent({
+    required this.section,
+    required this.pharmacyId,
+    required this.isAppAdmin,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return buildScaffold(
-      title: 'Solicitacoes de acesso',
-      description:
-          'Aprove ou rejeite pessoas que pediram acesso a uma farmacia ja cadastrada.',
-      onCreate: () => reload(),
-      createLabel: 'Atualizar',
-      child: items.isEmpty
-          ? const Center(
-              child: Text(
-                'Nenhuma solicitacao encontrada.',
-                style: TextStyle(color: AppColors.textLight),
-              ),
-            )
-          : ListView.separated(
-              itemCount: items.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 12),
-              itemBuilder: (_, index) {
-                final request = items[index] as Map<String, dynamic>;
-                final pharmacy = request['pharmacy'] as Map<String, dynamic>?;
-                final status = request['STATUS']?.toString() ?? 'pending';
-                final pending = status == 'pending';
-                return Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          request['NAME']?.toString() ?? 'Solicitante',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.textDark,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          '${request['EMAIL']} • ${pharmacy?['NAME'] ?? 'Farmacia'}',
-                          style: const TextStyle(color: AppColors.textLight),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          'Status: $status',
-                          style: TextStyle(
-                            color: pending
-                                ? AppColors.primaryDark
-                                : AppColors.textLight,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        if ((request['REQUEST_MESSAGE'] ?? '')
-                            .toString()
-                            .isNotEmpty) ...[
-                          const SizedBox(height: 10),
-                          Text(
-                            request['REQUEST_MESSAGE'].toString(),
-                            style: const TextStyle(color: AppColors.textDark),
-                          ),
-                        ],
-                        const SizedBox(height: 12),
-                        if (pending)
-                          Wrap(
-                            spacing: 10,
-                            children: [
-                              FilledButton(
-                                onPressed: () => handle(
-                                  () => service.approveAccessRequest(
-                                    request['ID'] as int,
-                                  ),
-                                ),
-                                child: const Text('Aprovar'),
-                              ),
-                              OutlinedButton(
-                                onPressed: () => handle(
-                                  () => service.rejectAccessRequest(
-                                    request['ID'] as int,
-                                  ),
-                                ),
-                                child: const Text('Rejeitar'),
-                              ),
-                            ],
-                          ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
-    );
-  }
-}
-
-class _CategoriesTabState extends _AdminListState<_CategoriesTab> {
-  @override
-  void initState() {
-    super.initState();
-    reload();
-  }
-
-  @override
-  Future<void> reload() async {
-    setState(() => loading = true);
-    try {
-      items = await service.listCategories(pharmacyId: widget.pharmacyId);
-    } catch (e) {
-      error = e.toString();
-    }
-    if (!mounted) return;
-    setState(() => loading = false);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return buildScaffold(
-      title: 'Categorias',
-      description:
-          'Organize o catalogo por grupos e mantenha a navegacao mais limpa.',
-      onCreate: () => _showCategoryDialog(),
-      child: ListView.separated(
-        itemCount: items.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 12),
-        itemBuilder: (_, index) {
-          final category = items[index] as Map<String, dynamic>;
-          final subcategories = category['subcategories'] as List? ?? [];
-          return Card(
-            child: ListTile(
-              title: Text(category['NAME']?.toString() ?? 'Categoria'),
-              subtitle: Text('${subcategories.length} subcategorias'),
-              trailing: Wrap(
-                spacing: 8,
-                children: [
-                  IconButton(
-                    onPressed: () => _showCategoryDialog(category: category),
-                    icon: const Icon(Icons.edit),
-                  ),
-                  IconButton(
-                    onPressed: () => handle(
-                      () => service.deleteCategory(category['ID'] as int),
-                    ),
-                    icon: const Icon(Icons.delete),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
+    return switch (section) {
+      _AdminSection.overview => _OverviewPage(
+        pharmacyId: pharmacyId,
+        isAppAdmin: isAppAdmin,
       ),
-    );
+      _AdminSection.pharmacies => _PharmaciesPage(
+        pharmacyId: pharmacyId,
+        canCreate: isAppAdmin,
+      ),
+      _AdminSection.categories => _CategoriesPage(pharmacyId: pharmacyId),
+      _AdminSection.medications => _MedicationsPage(pharmacyId: pharmacyId),
+      _AdminSection.inventory => _InventoryPage(pharmacyId: pharmacyId),
+      _AdminSection.promotions => _PromotionsPage(pharmacyId: pharmacyId),
+      _AdminSection.orders => _OrdersPage(pharmacyId: pharmacyId),
+    };
   }
+}
 
-  Future<void> _showCategoryDialog({Map<String, dynamic>? category}) async {
-    final name = TextEditingController(
-      text: category?['NAME']?.toString() ?? '',
-    );
-    final pharmacyId = TextEditingController(
-      text: (category?['PHARMACY_ID'] ?? widget.pharmacyId)?.toString() ?? '',
-    );
+class _AdminAccessDenied extends StatelessWidget {
+  const _AdminAccessDenied();
 
-    await showDialog<void>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(category == null ? 'Nova categoria' : 'Editar categoria'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _input(name, 'Nome'),
-            _input(pharmacyId, 'ID da farmacia'),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancelar'),
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(maxWidth: 460),
+      margin: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(24),
+      decoration: _panelDecoration(),
+      child: const Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.lock_outline, size: 40, color: _AdminColors.muted),
+          SizedBox(height: 14),
+          Text(
+            'Acesso administrativo indisponivel',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: _AdminColors.text,
+              fontSize: 18,
+              fontWeight: FontWeight.w900,
+            ),
           ),
-          FilledButton(
-            onPressed: () async {
-              Navigator.pop(dialogContext);
-              await handle(
-                () => service.saveCategory({
-                  'NAME': name.text,
-                  'PHARMACY_ID': int.tryParse(pharmacyId.text),
-                }, id: category?['ID'] as int?),
-              );
-            },
-            child: const Text('Salvar'),
+          SizedBox(height: 8),
+          Text(
+            'Esta area e restrita ao admin geral da SaveMed e aos administradores de farmacia.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: _AdminColors.muted),
           ),
         ],
       ),
     );
   }
-}
-
-class _MedicationsTab extends StatefulWidget {
-  final int? pharmacyId;
-
-  const _MedicationsTab({required this.pharmacyId});
-
-  @override
-  State<_MedicationsTab> createState() => _MedicationsTabState();
-}
-
-class _MedicationsTabState extends _AdminListState<_MedicationsTab> {
-  @override
-  void initState() {
-    super.initState();
-    reload();
-  }
-
-  @override
-  Future<void> reload() async {
-    setState(() => loading = true);
-    try {
-      items = await service.listMedications(pharmacyId: widget.pharmacyId);
-    } catch (e) {
-      error = e.toString();
-    }
-    if (!mounted) return;
-    setState(() => loading = false);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return buildScaffold(
-      title: 'Medicamentos',
-      description: 'Atualize o cadastro base dos itens exibidos na plataforma.',
-      onCreate: () => _showMedicationDialog(),
-      child: ListView.separated(
-        itemCount: items.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 12),
-        itemBuilder: (_, index) {
-          final medication = items[index] as Map<String, dynamic>;
-          return Card(
-            child: ListTile(
-              title: Text(medication['NAME']?.toString() ?? 'Medicamento'),
-              subtitle: Text(
-                'Farmacia ${medication['PHARMACY_ID']} • Categoria ${medication['CATEGORY_ID']}',
-              ),
-              trailing: Wrap(
-                spacing: 8,
-                children: [
-                  IconButton(
-                    onPressed: () =>
-                        _showMedicationDialog(medication: medication),
-                    icon: const Icon(Icons.edit),
-                  ),
-                  IconButton(
-                    onPressed: () => handle(
-                      () => service.deleteMedication(medication['ID'] as int),
-                    ),
-                    icon: const Icon(Icons.delete),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  Future<void> _showMedicationDialog({Map<String, dynamic>? medication}) async {
-    final name = TextEditingController(
-      text: medication?['NAME']?.toString() ?? '',
-    );
-    final description = TextEditingController(
-      text: medication?['DESCRIPTION']?.toString() ?? '',
-    );
-    final pharmacyId = TextEditingController(
-      text: (medication?['PHARMACY_ID'] ?? widget.pharmacyId)?.toString() ?? '',
-    );
-    final categoryId = TextEditingController(
-      text: medication?['CATEGORY_ID']?.toString() ?? '',
-    );
-    final subcategoryId = TextEditingController(
-      text: medication?['SUBCATEGORY_ID']?.toString() ?? '',
-    );
-
-    await showDialog<void>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(
-          medication == null ? 'Novo medicamento' : 'Editar medicamento',
-        ),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _input(name, 'Nome'),
-              _input(description, 'Descricao'),
-              _input(pharmacyId, 'ID da farmacia'),
-              _input(categoryId, 'ID da categoria'),
-              _input(subcategoryId, 'ID da subcategoria'),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () async {
-              Navigator.pop(dialogContext);
-              await handle(
-                () => service.saveMedication({
-                  'NAME': name.text,
-                  'DESCRIPTION': description.text,
-                  'PHARMACY_ID': int.tryParse(pharmacyId.text),
-                  'CATEGORY_ID': int.tryParse(categoryId.text),
-                  'SUBCATEGORY_ID': int.tryParse(subcategoryId.text),
-                }, id: medication?['ID'] as int?),
-              );
-            },
-            child: const Text('Salvar'),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _InventoryTab extends StatefulWidget {
-  final int? pharmacyId;
-
-  const _InventoryTab({required this.pharmacyId});
-
-  @override
-  State<_InventoryTab> createState() => _InventoryTabState();
-}
-
-class _InventoryTabState extends _AdminListState<_InventoryTab> {
-  @override
-  void initState() {
-    super.initState();
-    reload();
-  }
-
-  @override
-  Future<void> reload() async {
-    setState(() => loading = true);
-    try {
-      items = await service.listInventory(pharmacyId: widget.pharmacyId);
-    } catch (e) {
-      error = e.toString();
-    }
-    if (!mounted) return;
-    setState(() => loading = false);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return buildScaffold(
-      title: 'Inventario',
-      description:
-          'Controle preco, estoque e associacao entre farmacia e medicamento.',
-      onCreate: () => _showInventoryDialog(),
-      child: ListView.separated(
-        itemCount: items.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 12),
-        itemBuilder: (_, index) {
-          final inventory = items[index] as Map<String, dynamic>;
-          final med =
-              (inventory['Medication'] ?? inventory['medication'])
-                  as Map<String, dynamic>?;
-          return Card(
-            child: ListTile(
-              title: Text(med?['NAME']?.toString() ?? 'Item'),
-              subtitle: Text(
-                'Farmacia ${inventory['PHARMACY_ID']} • Estoque ${inventory['STOCK']} • R\$ ${inventory['PRICE']}',
-              ),
-              trailing: Wrap(
-                spacing: 8,
-                children: [
-                  IconButton(
-                    onPressed: () => _showInventoryDialog(inventory: inventory),
-                    icon: const Icon(Icons.edit),
-                  ),
-                  IconButton(
-                    onPressed: () => handle(
-                      () => service.deleteInventory(inventory['ID'] as int),
-                    ),
-                    icon: const Icon(Icons.delete),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  Future<void> _showInventoryDialog({Map<String, dynamic>? inventory}) async {
-    final pharmacyId = TextEditingController(
-      text: (inventory?['PHARMACY_ID'] ?? widget.pharmacyId)?.toString() ?? '',
-    );
-    final medicationId = TextEditingController(
-      text: inventory?['MEDICATION_ID']?.toString() ?? '',
-    );
-    final price = TextEditingController(
-      text: inventory?['PRICE']?.toString() ?? '',
-    );
-    final originalPrice = TextEditingController(
-      text: inventory?['ORIGINAL_PRICE']?.toString() ?? '',
-    );
-    final stock = TextEditingController(
-      text: inventory?['STOCK']?.toString() ?? '',
-    );
-
-    await showDialog<void>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(inventory == null ? 'Novo item' : 'Editar item'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _input(pharmacyId, 'ID da farmacia'),
-              _input(medicationId, 'ID do medicamento'),
-              _input(price, 'Preco'),
-              _input(originalPrice, 'Preco original'),
-              _input(stock, 'Estoque'),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () async {
-              Navigator.pop(dialogContext);
-              await handle(
-                () => service.saveInventory({
-                  'PHARMACY_ID': int.tryParse(pharmacyId.text),
-                  'MEDICATION_ID': int.tryParse(medicationId.text),
-                  'PRICE': double.tryParse(price.text),
-                  'ORIGINAL_PRICE': double.tryParse(originalPrice.text),
-                  'STOCK': int.tryParse(stock.text),
-                }, id: inventory?['ID'] as int?),
-              );
-            },
-            child: const Text('Salvar'),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _OrdersTab extends StatefulWidget {
-  final int? pharmacyId;
-
-  const _OrdersTab({required this.pharmacyId});
-
-  @override
-  State<_OrdersTab> createState() => _OrdersTabState();
-}
-
-class _OrdersTabState extends _AdminListState<_OrdersTab> {
-  @override
-  void initState() {
-    super.initState();
-    reload();
-  }
-
-  @override
-  Future<void> reload() async {
-    setState(() => loading = true);
-    try {
-      items = await service.listOrders(pharmacyId: widget.pharmacyId);
-    } catch (e) {
-      error = e.toString();
-    }
-    if (!mounted) return;
-    setState(() => loading = false);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return buildScaffold(
-      title: 'Pedidos',
-      description:
-          'Monitore status, pagamento e acione estorno quando necessario.',
-      onCreate: () => reload(),
-      child: ListView.separated(
-        itemCount: items.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 12),
-        itemBuilder: (_, index) {
-          final order = items[index] as Map<String, dynamic>;
-          final pharmacyName = order['pharmacy']?['NAME'] ?? 'Farmacia';
-          return Card(
-            child: ListTile(
-              title: Text('Pedido #${order['ID']} • $pharmacyName'),
-              subtitle: Text(
-                'Status ${order['STATUS']} • Pagamento ${order['PAYMENT_STATUS']} • Total R\$ ${order['TOTAL_AMOUNT']}',
-              ),
-              trailing: Wrap(
-                spacing: 8,
-                children: [
-                  IconButton(
-                    onPressed: () => _showOrderDialog(order),
-                    icon: const Icon(Icons.edit),
-                  ),
-                  TextButton(
-                    onPressed: () =>
-                        handle(() => service.refundOrder(order['ID'] as int)),
-                    child: const Text('Estornar'),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  Future<void> _showOrderDialog(Map<String, dynamic> order) async {
-    final status = TextEditingController(
-      text: order['STATUS']?.toString() ?? '',
-    );
-    final paymentStatus = TextEditingController(
-      text: order['PAYMENT_STATUS']?.toString() ?? '',
-    );
-
-    await showDialog<void>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text('Editar pedido #${order['ID']}'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _input(status, 'STATUS'),
-            _input(paymentStatus, 'PAYMENT_STATUS'),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () async {
-              Navigator.pop(dialogContext);
-              await handle(
-                () => service.updateOrder(order['ID'] as int, {
-                  'STATUS': status.text,
-                  'PAYMENT_STATUS': paymentStatus.text,
-                }),
-              );
-            },
-            child: const Text('Salvar'),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-Widget _input(TextEditingController controller, String label) {
-  return Padding(
-    padding: const EdgeInsets.only(bottom: 12),
-    child: TextField(
-      controller: controller,
-      decoration: InputDecoration(
-        labelText: label,
-        border: const OutlineInputBorder(),
-      ),
-    ),
-  );
 }

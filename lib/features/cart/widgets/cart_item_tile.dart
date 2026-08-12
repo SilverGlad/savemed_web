@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import 'package:SaveMed/core/controllers/cart_controller.dart';
-import 'package:SaveMed/core/theme/app_colors.dart';
-import 'package:SaveMed/models/cart_item.dart';
+import 'package:savemed/core/controllers/cart_controller.dart';
+import 'package:savemed/core/theme/app_colors.dart';
+import 'package:savemed/models/cart_item.dart';
 
 class CartItemTile extends StatelessWidget {
   final CartItem cartItem;
@@ -58,10 +58,7 @@ class _MobileCartItem extends StatelessWidget {
   final CartController cart;
   final CartItem cartItem;
 
-  const _MobileCartItem({
-    required this.cart,
-    required this.cartItem,
-  });
+  const _MobileCartItem({required this.cart, required this.cartItem});
 
   @override
   Widget build(BuildContext context) {
@@ -137,7 +134,11 @@ class _ProductImage extends StatelessWidget {
               borderRadius: BorderRadius.circular(20),
               child: Image.network(imageUrl!, fit: BoxFit.contain),
             )
-          : const Icon(Icons.medication_outlined, color: AppColors.primary, size: 36),
+          : const Icon(
+              Icons.medication_outlined,
+              color: AppColors.primary,
+              size: 36,
+            ),
     );
   }
 }

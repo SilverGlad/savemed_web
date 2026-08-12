@@ -7,7 +7,7 @@ class Medication {
   final String description;
   final String? image;
   final int categoryId;
-  final int subcategoryId;
+  final int? subcategoryId;
 
   // ⚠️ exemplo de bool
   final bool requiresPrescription;
@@ -18,23 +18,30 @@ class Medication {
     required this.description,
     this.image,
     required this.categoryId,
-    required this.subcategoryId,
+    this.subcategoryId,
     required this.requiresPrescription,
   });
 
   factory Medication.fromJson(Map<String, dynamic> json) {
     final name = (json['NAME'] ?? '').toString();
+    final id = _asInt(json['ID']);
+    final categoryId = _asInt(json['CATEGORY_ID']);
+
+    if (id == null || categoryId == null || name.trim().isEmpty) {
+      throw const FormatException('Produto com dados obrigatorios invalidos.');
+    }
 
     return Medication(
-      id: json['ID'],
+      id: id,
       name: name,
-      description: json['DESCRIPTION'],
+      description: (json['DESCRIPTION'] ?? '').toString(),
       image: _resolveImage(json['IMAGE'], name),
-      categoryId: json['CATEGORY_ID'],
-      subcategoryId: json['SUBCATEGORY_ID'],
+      categoryId: categoryId,
+      subcategoryId: _asInt(json['SUBCATEGORY_ID']),
 
       // 🔴 AQUI É O PONTO CRÍTICO
-      requiresPrescription: json['REQUIRES_PRESCRIPTION'] ?? false,
+      requiresPrescription:
+          json['REQUIRES_RX'] == true || json['REQUIRES_PRESCRIPTION'] == true,
     );
   }
 
@@ -43,6 +50,10 @@ class Medication {
 
     if (raw == null || raw.isEmpty) {
       if (medicationName.trim().isEmpty) return null;
+      return _buildImageUrl(medicationName);
+    }
+
+    if (imageValue is Map || imageValue is List) {
       return _buildImageUrl(medicationName);
     }
 
@@ -68,5 +79,10 @@ class Medication {
       return value;
     }
     return '$value.jpg';
+  }
+
+  static int? _asInt(Object? value) {
+    if (value is int) return value;
+    return int.tryParse(value?.toString() ?? '');
   }
 }

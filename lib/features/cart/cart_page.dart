@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import 'package:SaveMed/core/controllers/cart_controller.dart';
-import 'package:SaveMed/core/controllers/home_inventory_controller.dart';
-import 'package:SaveMed/core/theme/app_colors.dart';
-import 'package:SaveMed/core/widgets/inventory_section.dart';
-import 'package:SaveMed/core/widgets/savemed_footer.dart';
-import 'package:SaveMed/core/widgets/savemed_header.dart';
-import 'package:SaveMed/features/cart/widgets/cart_item_tile.dart';
-import 'package:SaveMed/features/cart/widgets/cart_summary_card.dart';
+import 'package:savemed/core/controllers/cart_controller.dart';
+import 'package:savemed/core/controllers/home_inventory_controller.dart';
+import 'package:savemed/core/theme/app_colors.dart';
+import 'package:savemed/core/widgets/inventory_section.dart';
+import 'package:savemed/core/widgets/savemed_footer.dart';
+import 'package:savemed/core/widgets/savemed_header.dart';
+import 'package:savemed/features/cart/widgets/cart_item_tile.dart';
+import 'package:savemed/features/cart/widgets/cart_summary_card.dart';
 
 class CartPage extends StatelessWidget {
   const CartPage({super.key});
@@ -54,7 +54,10 @@ class CartPage extends StatelessWidget {
                                   ),
                                 ),
                                 const SizedBox(width: 20),
-                                const Expanded(flex: 4, child: CartSummaryCard()),
+                                const Expanded(
+                                  flex: 4,
+                                  child: CartSummaryCard(),
+                                ),
                               ],
                             )
                           else ...[
@@ -91,7 +94,9 @@ class _CartHero extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final itemsLabel = cart.totalItems == 1 ? '1 item' : '${cart.totalItems} itens';
+    final itemsLabel = cart.totalItems == 1
+        ? '1 item'
+        : '${cart.totalItems} itens';
 
     return Container(
       width: double.infinity,
@@ -122,7 +127,10 @@ class _CartHero extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.white.withValues(alpha: 0.14),
                     borderRadius: BorderRadius.circular(999),
@@ -159,10 +167,7 @@ class _CartHero extends StatelessWidget {
             runSpacing: 12,
             children: [
               _MetricChip(label: 'Itens', value: itemsLabel),
-              _MetricChip(
-                label: 'Subtotal',
-                value: _format(cart.subtotal),
-              ),
+              _MetricChip(label: 'Subtotal', value: _format(cart.subtotal)),
               _MetricChip(
                 label: 'Farmacia',
                 value: cart.pharmacyName ?? 'Nao definida',
@@ -233,7 +238,9 @@ class _ProductList extends StatelessWidget {
       children: [
         Text(
           'Produtos no carrinho',
-          style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+          style: theme.textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.w800,
+          ),
         ),
         const SizedBox(height: 6),
         Text(
@@ -253,7 +260,11 @@ class _ProductList extends StatelessWidget {
             ),
             child: const Column(
               children: [
-                Icon(Icons.shopping_bag_outlined, size: 44, color: AppColors.primary),
+                Icon(
+                  Icons.shopping_bag_outlined,
+                  size: 44,
+                  color: AppColors.primary,
+                ),
                 SizedBox(height: 12),
                 Text(
                   'Adicione medicamentos para continuar.',
@@ -296,7 +307,9 @@ class _SuggestionsSection extends StatelessWidget {
       children: [
         Text(
           'Sugestoes para complementar o pedido',
-          style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+          style: theme.textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.w800,
+          ),
         ),
         const SizedBox(height: 6),
         Text(
@@ -320,10 +333,7 @@ class _SurfaceCard extends StatelessWidget {
   final Widget child;
   final EdgeInsetsGeometry padding;
 
-  const _SurfaceCard({
-    required this.child,
-    required this.padding,
-  });
+  const _SurfaceCard({required this.child, required this.padding});
 
   @override
   Widget build(BuildContext context) {

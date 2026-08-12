@@ -11,10 +11,12 @@ class AddressController extends ChangeNotifier {
     loading = true;
     notifyListeners();
 
-    addresses = await _service.getUserAddresses(userId);
-
-    loading = false;
-    notifyListeners();
+    try {
+      addresses = await _service.getUserAddresses(userId);
+    } finally {
+      loading = false;
+      notifyListeners();
+    }
   }
 
   Future<void> add(Map<String, dynamic> data, int userId) async {

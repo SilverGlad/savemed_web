@@ -1,6 +1,5 @@
-import 'dart:convert';
-
 import '../api/api_client.dart';
+import '../api/api_response.dart';
 
 class OrderService {
   Future<int> createOrder({
@@ -24,13 +23,17 @@ class OrderService {
       'TOTAL_AMOUNT': total,
     });
 
-    final data = jsonDecode(res.body);
-
-    if (res.statusCode != 201) {
-      throw Exception(data['error'] ?? 'Erro ao criar pedido');
-    }
-
-    return data['ID'];
+    final data = ApiResponse.object(
+      res,
+      expectedStatusCodes: {201},
+      fallback: 'Erro ao criar pedido',
+    );
+    final id = data['ID'];
+    if (id is int) return id;
+    throw ApiResponseException(
+      'Resposta invalida do servidor.',
+      res.statusCode,
+    );
   }
 
   Future<void> createOrderItem({
@@ -47,29 +50,30 @@ class OrderService {
       'TOTAL_PRICE': price * quantity,
     });
 
-    if (res.statusCode != 201) {
-      final data = jsonDecode(res.body);
-      throw Exception(data['error'] ?? 'Erro ao criar item do pedido');
-    }
+    ApiResponse.success(
+      res,
+      expectedStatusCodes: {201},
+      fallback: 'Erro ao criar item do pedido',
+    );
   }
 
   Future<List<dynamic>> getOrdersByCustomer(int customerId) async {
     final res = await ApiClient.get('/orders/$customerId');
 
-    if (res.statusCode != 200) {
-      throw Exception('Erro ao buscar pedidos');
-    }
-
-    return jsonDecode(res.body);
+    return ApiResponse.list(
+      res,
+      expectedStatusCodes: {200},
+      fallback: 'Erro ao buscar pedidos',
+    );
   }
 
   Future<Map<String, dynamic>> getOrderDetail(int orderId) async {
     final res = await ApiClient.get('/orders/detail/$orderId');
 
-    if (res.statusCode != 200) {
-      throw Exception('Erro ao buscar detalhes do pedido');
-    }
-
-    return jsonDecode(res.body);
+    return ApiResponse.object(
+      res,
+      expectedStatusCodes: {200},
+      fallback: 'Erro ao buscar detalhes do pedido',
+    );
   }
 }

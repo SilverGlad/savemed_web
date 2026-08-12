@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:SaveMed/core/controllers/home_inventory_controller.dart';
-import 'package:SaveMed/core/widgets/savemed_footer.dart';
+import 'package:savemed/core/controllers/home_inventory_controller.dart';
+import 'package:savemed/core/widgets/savemed_footer.dart';
 
 import '../../core/widgets/banner_carousel.dart';
 import '../../core/widgets/category_section.dart';

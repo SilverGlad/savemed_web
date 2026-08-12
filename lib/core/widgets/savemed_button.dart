@@ -26,7 +26,9 @@ class SaveMedButton extends StatelessWidget {
 
     final backgroundColor = outlined
         ? Colors.transparent
-        : (isDisabled ? AppColors.primary.withValues(alpha: 0.45) : AppColors.primary);
+        : (isDisabled
+              ? AppColors.primary.withValues(alpha: 0.45)
+              : AppColors.primary);
 
     final foregroundColor = outlined ? AppColors.primary : Colors.white;
 

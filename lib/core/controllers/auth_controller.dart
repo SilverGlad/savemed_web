@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:SaveMed/core/controllers/address_controller.dart';
+import 'package:savemed/core/auth/user_role.dart';
+import 'package:savemed/core/api/api_client.dart';
+import 'package:savemed/core/controllers/address_controller.dart';
 
 import '../services/auth_service.dart';
 import '../storage/token_storage.dart';
@@ -11,29 +13,34 @@ class AuthController extends ChangeNotifier {
   String? token;
   bool loading = true;
 
+  AuthController() {
+    ApiClient.setUnauthorizedHandler(_expireSession);
+  }
+
   bool get isLogged => token != null;
+  UserRole get role => UserRole.fromApi(user?['USER_ROLE']);
+  bool get isAdmin => role.isAdmin;
 
   Future<void> restoreSession(AddressController addressController) async {
-    final savedToken = await TokenStorage.getToken();
+    try {
+      final savedToken = await TokenStorage.getToken();
 
-    debugPrint('Saved token: $savedToken');
-
-    if (savedToken != null) {
-      token = savedToken;
-
-      try {
+      if (savedToken != null) {
+        token = savedToken;
         user = await _service.me();
-        await addressController.load(user!['ID']);
-      } catch (e) {
-        debugPrint('Erro ao restaurar sessao: $e');
-        token = null;
-        user = null;
-        await TokenStorage.clear();
+        if (!isAdmin) {
+          await addressController.load(user!['ID']);
+        }
       }
+    } catch (e) {
+      debugPrint('Nao foi possivel restaurar a sessao.');
+      token = null;
+      user = null;
+      await TokenStorage.clear();
+    } finally {
+      loading = false;
+      notifyListeners();
     }
-
-    loading = false;
-    notifyListeners();
   }
 
   Future<void> login(
@@ -47,7 +54,9 @@ class AuthController extends ChangeNotifier {
     user = result['user'];
 
     await TokenStorage.saveToken(token!);
-    await addressController.load(user!['ID']);
+    if (!isAdmin) {
+      await addressController.load(user!['ID']);
+    }
 
     notifyListeners();
   }
@@ -59,13 +68,10 @@ class AuthController extends ChangeNotifier {
     required String password,
     required String document,
     required String phone,
-    bool useExistingPharmacy = false,
-    int? pharmacyId,
     String? pharmacyName,
     String? city,
     String? state,
     String? zipcode,
-    String? requestMessage,
   }) async {
     if (isCustomer) {
       await _service.registerCustomer(
@@ -76,33 +82,28 @@ class AuthController extends ChangeNotifier {
         phone: phone,
       );
     } else {
-      if (useExistingPharmacy) {
-        await _service.requestExistingPharmacyAccess(
-          name: name,
-          email: email,
-          password: password,
-          cnpj: document,
-          phone: phone,
-          pharmacyId: pharmacyId!,
-          requestMessage: requestMessage,
-        );
-      } else {
-        await _service.registerSeller(
-          name: name,
-          email: email,
-          password: password,
-          cnpj: document,
-          phone: phone,
-          pharmacyName: pharmacyName!,
-          city: city!,
-          state: state!,
-          zipcode: zipcode!,
-        );
-      }
+      await _service.registerSeller(
+        name: name,
+        email: email,
+        password: password,
+        cnpj: document,
+        phone: phone,
+        pharmacyName: pharmacyName!,
+        city: city!,
+        state: state!,
+        zipcode: zipcode!,
+      );
     }
   }
 
   Future<void> logout() async {
+    token = null;
+    user = null;
+    await TokenStorage.clear();
+    notifyListeners();
+  }
+
+  Future<void> _expireSession() async {
     token = null;
     user = null;
     await TokenStorage.clear();

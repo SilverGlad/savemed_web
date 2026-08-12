@@ -11,13 +11,15 @@ class CardController extends ChangeNotifier {
     loading = true;
     notifyListeners();
 
-    final stored = await CardStorage.load();
-    cards
-      ..clear()
-      ..addAll(stored);
-
-    loading = false;
-    notifyListeners();
+    try {
+      final stored = await CardStorage.load();
+      cards
+        ..clear()
+        ..addAll(stored);
+    } finally {
+      loading = false;
+      notifyListeners();
+    }
   }
 
   Future<void> addCard(PaymentCard card) async {

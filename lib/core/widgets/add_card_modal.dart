@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:SaveMed/core/utils/input_formatters.dart';
-import 'package:SaveMed/models/payment_card.dart';
+import 'package:savemed/core/utils/input_formatters.dart';
+import 'package:savemed/models/payment_card.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/controllers/card_controller.dart';

@@ -1,11 +1,10 @@
-import 'dart:convert';
-
 import '../api/api_client.dart';
+import '../api/api_response.dart';
 
 class ShippingQuoteException implements Exception {
   final String message;
 
-  ShippingQuoteException(this.message);
+  const ShippingQuoteException(this.message);
 
   @override
   String toString() => message;
@@ -27,32 +26,18 @@ class ShippingService {
       'products': products,
     });
 
-    final dynamic decodedBody = jsonDecode(response.body);
-
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      if (decodedBody is Map<String, dynamic>) {
-        final details = decodedBody['details']?.toString();
-        final error = decodedBody['error']?.toString();
-
-        throw ShippingQuoteException(
-          details?.isNotEmpty == true
-              ? details!
-              : error?.isNotEmpty == true
-              ? error!
-              : 'Nao foi possivel calcular o frete agora.',
-        );
-      }
-
-      throw ShippingQuoteException('Nao foi possivel calcular o frete agora.');
+    try {
+      final data = ApiResponse.list(
+        response,
+        expectedStatusCodes: {200},
+        fallback: 'Nao foi possivel calcular o frete agora.',
+      );
+      return data
+          .whereType<Map<String, dynamic>>()
+          .where((entry) => entry['price'] != null)
+          .toList();
+    } on ApiResponseException catch (error) {
+      throw ShippingQuoteException(error.message);
     }
-
-    if (decodedBody is! List) {
-      throw ShippingQuoteException('Resposta invalida do servico de frete.');
-    }
-
-    return decodedBody
-        .where((entry) => entry['price'] != null)
-        .cast<Map<String, dynamic>>()
-        .toList();
   }
 }

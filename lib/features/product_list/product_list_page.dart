@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:SaveMed/core/widgets/savemed_footer.dart';
-import 'package:SaveMed/features/product_list/widgets/breadcrumbs.dart';
-import 'package:SaveMed/features/product_list/widgets/inventory_grid_box.dart';
-import 'package:SaveMed/models/category.dart';
+import 'package:savemed/core/widgets/savemed_footer.dart';
+import 'package:savemed/features/product_list/widgets/breadcrumbs.dart';
+import 'package:savemed/features/product_list/widgets/inventory_grid_box.dart';
+import 'package:savemed/models/category.dart';
 
 import '../../core/controllers/inventory_controller.dart';
 import '../../core/widgets/savemed_header.dart';

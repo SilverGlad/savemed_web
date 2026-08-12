@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:SaveMed/core/utils/input_formatters.dart';
-import 'package:SaveMed/models/cart_item.dart';
+import 'package:savemed/core/utils/input_formatters.dart';
+import 'package:savemed/models/cart_item.dart';
 
 import '../services/order_service.dart';
 
@@ -22,32 +22,33 @@ class OrderController extends ChangeNotifier {
     loading = true;
     notifyListeners();
 
-    final shippingPrice = toDouble(shipping['price']);
-    final total = subtotal + shippingPrice;
-    final deliveryMethod = shipping['method']?.toString() ?? 'shipping';
-    final companyName = shipping['company']?['name']?.toString();
-    final serviceName = shipping['name']?.toString();
-    final deliveryLabel = [
-      companyName,
-      serviceName,
-    ].whereType<String>().where((value) => value.isNotEmpty).join(' - ');
+    try {
+      final shippingPrice = toDouble(shipping['price']);
+      final total = subtotal + shippingPrice;
+      final deliveryMethod = shipping['method']?.toString() ?? 'shipping';
+      final companyName = shipping['company']?['name']?.toString();
+      final serviceName = shipping['name']?.toString();
+      final deliveryLabel = [
+        companyName,
+        serviceName,
+      ].whereType<String>().where((value) => value.isNotEmpty).join(' - ');
 
-    final id = await _service.createOrder(
-      customerId: customerId,
-      pharmacyId: pharmacyId,
-      addressId: addressId,
-      shippingPrice: shippingPrice,
-      deliveryMethod: deliveryMethod,
-      deliveryLabel: deliveryLabel.isEmpty ? null : deliveryLabel,
-      subtotal: subtotal,
-      total: total,
-    );
-
-    currentOrderId = id;
-
-    loading = false;
-    notifyListeners();
-    return id;
+      final id = await _service.createOrder(
+        customerId: customerId,
+        pharmacyId: pharmacyId,
+        addressId: addressId,
+        shippingPrice: shippingPrice,
+        deliveryMethod: deliveryMethod,
+        deliveryLabel: deliveryLabel.isEmpty ? null : deliveryLabel,
+        subtotal: subtotal,
+        total: total,
+      );
+      currentOrderId = id;
+      return id;
+    } finally {
+      loading = false;
+      notifyListeners();
+    }
   }
 
   Future<void> createOrderItems(int orderId, List<CartItem> items) async {
@@ -65,19 +66,23 @@ class OrderController extends ChangeNotifier {
     loading = true;
     notifyListeners();
 
-    orders = await _service.getOrdersByCustomer(customerId);
-
-    loading = false;
-    notifyListeners();
+    try {
+      orders = await _service.getOrdersByCustomer(customerId);
+    } finally {
+      loading = false;
+      notifyListeners();
+    }
   }
 
   Future<void> loadOrderDetail(int orderId) async {
     loading = true;
     notifyListeners();
 
-    currentOrder = await _service.getOrderDetail(orderId);
-
-    loading = false;
-    notifyListeners();
+    try {
+      currentOrder = await _service.getOrderDetail(orderId);
+    } finally {
+      loading = false;
+      notifyListeners();
+    }
   }
 }

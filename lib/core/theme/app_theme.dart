@@ -73,10 +73,7 @@ class AppTheme {
           fontWeight: FontWeight.w500,
           color: AppColors.textDark,
         ),
-        bodyMedium: TextStyle(
-          fontSize: 13,
-          color: AppColors.textLight,
-        ),
+        bodyMedium: TextStyle(fontSize: 13, color: AppColors.textLight),
       ),
     );
   }

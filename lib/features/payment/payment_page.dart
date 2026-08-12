@@ -1,19 +1,20 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:savemed/core/domain/order_status.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
-import 'package:SaveMed/core/controllers/auth_controller.dart';
-import 'package:SaveMed/core/controllers/card_controller.dart';
-import 'package:SaveMed/core/controllers/cart_controller.dart';
-import 'package:SaveMed/core/controllers/payment_controller.dart';
-import 'package:SaveMed/core/theme/app_colors.dart';
-import 'package:SaveMed/core/widgets/add_card_modal.dart';
-import 'package:SaveMed/core/widgets/savemed_button.dart';
-import 'package:SaveMed/core/widgets/savemed_footer.dart';
-import 'package:SaveMed/core/widgets/savemed_header.dart';
+import 'package:savemed/core/controllers/auth_controller.dart';
+import 'package:savemed/core/controllers/card_controller.dart';
+import 'package:savemed/core/controllers/cart_controller.dart';
+import 'package:savemed/core/controllers/payment_controller.dart';
+import 'package:savemed/core/theme/app_colors.dart';
+import 'package:savemed/core/widgets/add_card_modal.dart';
+import 'package:savemed/core/widgets/savemed_button.dart';
+import 'package:savemed/core/widgets/savemed_footer.dart';
+import 'package:savemed/core/widgets/savemed_header.dart';
 
 import 'payment_result_page.dart';
 
@@ -68,7 +69,7 @@ class _PaymentPageState extends State<PaymentPage> {
     ) async {
       final status = await paymentCtrl.checkStatus(orderId: widget.orderId);
 
-      if (status == 'paid') {
+      if (PaymentStatus.fromApi(status) == PaymentStatus.paid) {
         timer.cancel();
         if (!mounted) return;
         cartController.clear();

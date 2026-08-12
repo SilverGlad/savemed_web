@@ -1,38 +1,40 @@
-import 'dart:convert';
 import '../api/api_client.dart';
+import '../api/api_response.dart';
 
 class AddressService {
   Future<List<dynamic>> getUserAddresses(int userId) async {
-    final res = await ApiClient.get('/addresses/user/$userId', query: {});
-
-    if (res.statusCode != 200) {
-      throw Exception('Erro ao buscar endereços');
-    }
-
-    return jsonDecode(res.body);
+    final response = await ApiClient.get('/addresses/user/$userId');
+    return ApiResponse.list(
+      response,
+      expectedStatusCodes: {200},
+      fallback: 'Erro ao buscar enderecos',
+    );
   }
 
   Future<void> createAddress(Map<String, dynamic> data) async {
-    final res = await ApiClient.post('/addresses', data);
-
-    if (res.statusCode != 201) {
-      throw Exception('Erro ao criar endereço');
-    }
+    final response = await ApiClient.post('/addresses', data);
+    ApiResponse.success(
+      response,
+      expectedStatusCodes: {201},
+      fallback: 'Erro ao criar endereco',
+    );
   }
 
   Future<void> updateAddress(int id, Map<String, dynamic> data) async {
-    final res = await ApiClient.put('/addresses/$id', data);
-
-    if (res.statusCode != 200) {
-      throw Exception('Erro ao atualizar endereço');
-    }
+    final response = await ApiClient.put('/addresses/$id', data);
+    ApiResponse.success(
+      response,
+      expectedStatusCodes: {200},
+      fallback: 'Erro ao atualizar endereco',
+    );
   }
 
   Future<void> deleteAddress(int id) async {
-    final res = await ApiClient.delete('/addresses/$id');
-
-    if (res.statusCode != 200) {
-      throw Exception('Erro ao remover endereço');
-    }
+    final response = await ApiClient.delete('/addresses/$id');
+    ApiResponse.success(
+      response,
+      expectedStatusCodes: {200, 204},
+      fallback: 'Erro ao remover endereco',
+    );
   }
 }

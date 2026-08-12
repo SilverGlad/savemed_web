@@ -1,10 +1,15 @@
-import 'dart:convert';
+import 'package:http/http.dart' as http;
 
 import '../api/api_client.dart';
+import '../api/api_response.dart';
+import '../auth/user_role.dart';
 
 class AdminService {
   Future<List<dynamic>> listPharmacies() async {
-    final res = await ApiClient.get('/pharmacies');
+    final res = await ApiClient.get(
+      '/pharmacies',
+      query: {'includeInactive': 'true'},
+    );
     return _decodeList(res, 'Erro ao buscar farmacias');
   }
 
@@ -12,19 +17,59 @@ class AdminService {
     final response = id == null
         ? await ApiClient.post('/pharmacies', data)
         : await ApiClient.put('/pharmacies/$id', data);
-    _ensureSuccess(
-      response.statusCode,
-      response.body,
+    ApiResponse.success(
+      response,
+      expectedStatusCodes: {200, 201, 204},
       fallback: 'Erro ao salvar farmacia',
     );
   }
 
   Future<void> deletePharmacy(int id) async {
     final response = await ApiClient.delete('/pharmacies/$id');
-    _ensureSuccess(
-      response.statusCode,
-      response.body,
+    ApiResponse.success(
+      response,
+      expectedStatusCodes: {200, 201, 204},
       fallback: 'Erro ao remover farmacia',
+    );
+  }
+
+  Future<List<dynamic>> listPharmacyUsers(int pharmacyId) async {
+    final response = await ApiClient.get('/users/pharmacy/$pharmacyId');
+    return _decodeList(response, 'Erro ao buscar usuarios da farmacia');
+  }
+
+  Future<void> createPharmacyUser({
+    required int pharmacyId,
+    required String name,
+    required String email,
+    required String password,
+    required UserRole role,
+    String? phone,
+  }) async {
+    final response = await ApiClient.post('/users/register', {
+      'NAME': name,
+      'EMAIL': email,
+      'PASSWORD': password,
+      'USER_ROLE': role.apiValue,
+      'PHARMACY_ID': pharmacyId,
+      'PHONE_NUMBER': phone,
+    });
+    ApiResponse.success(
+      response,
+      expectedStatusCodes: {200, 201, 204},
+      fallback: 'Erro ao criar usuario da farmacia',
+    );
+  }
+
+  Future<void> resetUserPassword(int userId, String password) async {
+    final response = await ApiClient.post(
+      '/users/$userId/admin-reset-password',
+      {'PASSWORD': password},
+    );
+    ApiResponse.success(
+      response,
+      expectedStatusCodes: {200, 201, 204},
+      fallback: 'Erro ao redefinir senha',
     );
   }
 
@@ -40,18 +85,18 @@ class AdminService {
     final response = id == null
         ? await ApiClient.post('/categories', data)
         : await ApiClient.put('/categories/$id', data);
-    _ensureSuccess(
-      response.statusCode,
-      response.body,
+    ApiResponse.success(
+      response,
+      expectedStatusCodes: {200, 201, 204},
       fallback: 'Erro ao salvar categoria',
     );
   }
 
   Future<void> deleteCategory(int id) async {
     final response = await ApiClient.delete('/categories/$id');
-    _ensureSuccess(
-      response.statusCode,
-      response.body,
+    ApiResponse.success(
+      response,
+      expectedStatusCodes: {200, 201, 204},
       fallback: 'Erro ao remover categoria',
     );
   }
@@ -68,18 +113,18 @@ class AdminService {
     final response = id == null
         ? await ApiClient.post('/medications', data)
         : await ApiClient.put('/medications/$id', data);
-    _ensureSuccess(
-      response.statusCode,
-      response.body,
+    ApiResponse.success(
+      response,
+      expectedStatusCodes: {200, 201, 204},
       fallback: 'Erro ao salvar medicamento',
     );
   }
 
   Future<void> deleteMedication(int id) async {
     final response = await ApiClient.delete('/medications/$id');
-    _ensureSuccess(
-      response.statusCode,
-      response.body,
+    ApiResponse.success(
+      response,
+      expectedStatusCodes: {200, 201, 204},
       fallback: 'Erro ao remover medicamento',
     );
   }
@@ -95,19 +140,46 @@ class AdminService {
     final response = id == null
         ? await ApiClient.post('/inventory', data)
         : await ApiClient.put('/inventory/$id', data);
-    _ensureSuccess(
-      response.statusCode,
-      response.body,
+    ApiResponse.success(
+      response,
+      expectedStatusCodes: {200, 201, 204},
       fallback: 'Erro ao salvar item do inventario',
     );
   }
 
   Future<void> deleteInventory(int id) async {
     final response = await ApiClient.delete('/inventory/$id');
-    _ensureSuccess(
-      response.statusCode,
-      response.body,
+    ApiResponse.success(
+      response,
+      expectedStatusCodes: {200, 201, 204},
       fallback: 'Erro ao remover item do inventario',
+    );
+  }
+
+  Future<List<dynamic>> listHighlights({int? pharmacyId}) async {
+    final response = await ApiClient.get(
+      pharmacyId == null ? '/highlights' : '/highlights/pharmacy/$pharmacyId',
+    );
+    return _decodeList(response, 'Erro ao buscar promocoes');
+  }
+
+  Future<void> saveHighlight(Map<String, dynamic> data, {int? id}) async {
+    final response = id == null
+        ? await ApiClient.post('/highlights', data)
+        : await ApiClient.put('/highlights/$id', data);
+    ApiResponse.success(
+      response,
+      expectedStatusCodes: {200, 201, 204},
+      fallback: 'Erro ao salvar promocao',
+    );
+  }
+
+  Future<void> deleteHighlight(int id) async {
+    final response = await ApiClient.delete('/highlights/$id');
+    ApiResponse.success(
+      response,
+      expectedStatusCodes: {200, 201, 204},
+      fallback: 'Erro ao remover promocao',
     );
   }
 
@@ -119,71 +191,29 @@ class AdminService {
     return _decodeList(res, 'Erro ao buscar pedidos');
   }
 
-  Future<List<dynamic>> listAccessRequests({int? pharmacyId}) async {
-    final res = await ApiClient.get(
-      '/users/access-requests',
-      query: pharmacyId == null ? null : {'pharmacyId': '$pharmacyId'},
-    );
-    return _decodeList(res, 'Erro ao buscar solicitacoes');
-  }
-
-  Future<void> approveAccessRequest(int id) async {
-    final response = await ApiClient.post(
-      '/users/access-requests/$id/approve',
-      {},
-    );
-    _ensureSuccess(
-      response.statusCode,
-      response.body,
-      fallback: 'Erro ao aprovar solicitacao',
-    );
-  }
-
-  Future<void> rejectAccessRequest(int id) async {
-    final response = await ApiClient.post(
-      '/users/access-requests/$id/reject',
-      {},
-    );
-    _ensureSuccess(
-      response.statusCode,
-      response.body,
-      fallback: 'Erro ao rejeitar solicitacao',
-    );
-  }
-
   Future<void> updateOrder(int id, Map<String, dynamic> data) async {
     final response = await ApiClient.put('/orders/$id', data);
-    _ensureSuccess(
-      response.statusCode,
-      response.body,
+    ApiResponse.success(
+      response,
+      expectedStatusCodes: {200, 201, 204},
       fallback: 'Erro ao atualizar pedido',
     );
   }
 
   Future<void> refundOrder(int id) async {
     final response = await ApiClient.post('/orders/$id/refund', {});
-    _ensureSuccess(
-      response.statusCode,
-      response.body,
+    ApiResponse.success(
+      response,
+      expectedStatusCodes: {200, 201, 204},
       fallback: 'Erro ao estornar pedido',
     );
   }
 
-  List<dynamic> _decodeList(dynamic response, String fallback) {
-    if (response.statusCode != 200) {
-      _ensureSuccess(response.statusCode, response.body, fallback: fallback);
-    }
-    return jsonDecode(response.body) as List<dynamic>;
-  }
-
-  void _ensureSuccess(int statusCode, String body, {required String fallback}) {
-    if (statusCode >= 200 && statusCode < 300) return;
-
-    String message = fallback;
-    try {
-      final data = jsonDecode(body);
-      message = data['error']?.toString() ?? fallback;
-    } catch (_) {}
-    throw Exception(message);
+  List<dynamic> _decodeList(http.Response response, String fallback) {
+    return ApiResponse.list(
+      response,
+      expectedStatusCodes: {200},
+      fallback: fallback,
+    );
   }
 }

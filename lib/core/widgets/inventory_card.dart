@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-import 'package:SaveMed/core/controllers/cart_controller.dart';
-import 'package:SaveMed/core/theme/app_colors.dart';
-import 'package:SaveMed/core/widgets/confirm_clear_cart_dialog.dart';
-import 'package:SaveMed/features/cart/cart_page.dart';
-import 'package:SaveMed/features/product_detail/product_detail_page.dart';
-import 'package:SaveMed/models/inventory_item.dart';
+import 'package:savemed/core/controllers/cart_controller.dart';
+import 'package:savemed/core/theme/app_colors.dart';
+import 'package:savemed/core/widgets/confirm_clear_cart_dialog.dart';
+import 'package:savemed/features/cart/cart_page.dart';
+import 'package:savemed/features/product_detail/product_detail_page.dart';
+import 'package:savemed/models/inventory_item.dart';
 
 class InventoryCard extends StatefulWidget {
   final InventoryItem item;

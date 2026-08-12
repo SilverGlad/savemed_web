@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../theme/app_colors.dart';
 
-const double _shellMaxWidth = 1180;
-
 class SaveMedFooter extends StatelessWidget {
   const SaveMedFooter({super.key});
 

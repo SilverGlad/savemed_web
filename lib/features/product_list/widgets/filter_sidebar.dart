@@ -40,19 +40,23 @@ class FilterSidebar extends StatelessWidget {
             const Text('Categorias'),
             const SizedBox(height: 8),
 
-            ...categoryController.categories.map((category) {
-              return RadioListTile<int>(
-                dense: true,
-                value: category.id,
-                groupValue: inventoryController.categoryId,
-                title: Text(category.name),
-                onChanged: (value) {
-                  if (value != null) {
-                    inventoryController.setCategory(value);
-                  }
-                },
-              );
-            }),
+            RadioGroup<int>(
+              groupValue: inventoryController.categoryId,
+              onChanged: (value) {
+                if (value != null) inventoryController.setCategory(value);
+              },
+              child: Column(
+                children: categoryController.categories
+                    .map(
+                      (category) => RadioListTile<int>(
+                        dense: true,
+                        value: category.id,
+                        title: Text(category.name),
+                      ),
+                    )
+                    .toList(),
+              ),
+            ),
 
             // =====================
             // SUBCATEGORIAS
@@ -63,19 +67,23 @@ class FilterSidebar extends StatelessWidget {
               const Text('Subcategorias'),
               const SizedBox(height: 8),
 
-              ...selectedCategory.subcategories.map((sub) {
-                return RadioListTile<int>(
-                  dense: true,
-                  value: sub.id,
-                  groupValue: inventoryController.subcategoryId,
-                  title: Text(sub.name),
-                  onChanged: (value) {
-                    if (value != null) {
-                      inventoryController.setSubcategory(value);
-                    }
-                  },
-                );
-              }),
+              RadioGroup<int>(
+                groupValue: inventoryController.subcategoryId,
+                onChanged: (value) {
+                  if (value != null) inventoryController.setSubcategory(value);
+                },
+                child: Column(
+                  children: selectedCategory.subcategories
+                      .map(
+                        (sub) => RadioListTile<int>(
+                          dense: true,
+                          value: sub.id,
+                          title: Text(sub.name),
+                        ),
+                      )
+                      .toList(),
+                ),
+              ),
             ],
 
             const Divider(),

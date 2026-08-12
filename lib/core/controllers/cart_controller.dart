@@ -1,4 +1,4 @@
-import 'package:SaveMed/core/services/shipping_service.dart';
+import 'package:savemed/core/services/shipping_service.dart';
 import 'package:flutter/material.dart';
 
 import '../../models/cart_item.dart';

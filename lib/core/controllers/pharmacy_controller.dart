@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:SaveMed/core/services/pharmacy_service.dart';
+import 'package:savemed/core/services/pharmacy_service.dart';
 
 class PharmacyController extends ChangeNotifier {
   final _service = PharmacyService();

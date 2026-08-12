@@ -1,19 +1,17 @@
 import 'package:flutter/material.dart' hide SearchController;
 import 'package:provider/provider.dart';
 
-import 'package:SaveMed/core/controllers/auth_controller.dart';
-import 'package:SaveMed/core/controllers/cart_controller.dart';
-import 'package:SaveMed/core/controllers/search_controller.dart';
-import 'package:SaveMed/core/theme/app_colors.dart';
+import 'package:savemed/core/controllers/auth_controller.dart';
+import 'package:savemed/core/controllers/cart_controller.dart';
+import 'package:savemed/core/controllers/search_controller.dart';
+import 'package:savemed/core/theme/app_colors.dart';
 
-import 'package:SaveMed/features/admin/admin_page.dart';
-import 'package:SaveMed/features/auth/auth_page.dart';
-import 'package:SaveMed/features/cart/cart_page.dart';
-import 'package:SaveMed/features/product_detail/product_detail_page.dart';
-import 'package:SaveMed/features/profile/profile_page.dart';
-import 'package:SaveMed/models/inventory_item.dart';
-
-const double _shellMaxWidth = 1180;
+import 'package:savemed/features/admin/admin_page.dart';
+import 'package:savemed/features/auth/auth_page.dart';
+import 'package:savemed/features/cart/cart_page.dart';
+import 'package:savemed/features/product_detail/product_detail_page.dart';
+import 'package:savemed/features/profile/profile_page.dart';
+import 'package:savemed/models/inventory_item.dart';
 
 class SaveMedHeader extends StatefulWidget {
   const SaveMedHeader({super.key});
@@ -489,8 +487,7 @@ class _UserMenu extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final role = context.watch<AuthController>().user?['USER_ROLE'];
-    final canAccessAdmin = role == 'app_admin' || role == 'pharmacy_admin';
+    final canAccessAdmin = context.watch<AuthController>().isAdmin;
 
     return PopupMenuButton<String>(
       offset: const Offset(0, 42),

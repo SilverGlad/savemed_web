@@ -2,9 +2,9 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
-import 'package:SaveMed/core/controllers/address_controller.dart';
-import 'package:SaveMed/core/controllers/auth_controller.dart';
-import 'package:SaveMed/core/widgets/savemed_button.dart';
+import 'package:savemed/core/controllers/address_controller.dart';
+import 'package:savemed/core/controllers/auth_controller.dart';
+import 'package:savemed/core/widgets/savemed_button.dart';
 
 class AddressModal extends StatefulWidget {
   final Map? address;
