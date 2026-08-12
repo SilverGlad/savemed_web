@@ -21,7 +21,7 @@ class PaymentResultPage extends StatelessWidget {
 
           Expanded(
             child: SingleChildScrollView(
-              padding: EdgeInsets.all(isMobile ? 16 : 24),
+              padding: EdgeInsets.all(isMobile ? 12 : 24),
               child: Center(
                 child: ConstrainedBox(
                   constraints: BoxConstraints(
@@ -83,8 +83,10 @@ class PaymentResultPage extends StatelessWidget {
               ),
             ),
           ),
-
-          const SaveMedFooter(),
+          Padding(
+            padding: EdgeInsets.fromLTRB(isMobile ? 12 : 24, 0, isMobile ? 12 : 24, 24),
+            child: const SaveMedFooter(),
+          ),
         ],
       ),
     );

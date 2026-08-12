@@ -50,7 +50,7 @@ class _InventoryCardState extends State<InventoryCard> {
               ? (Matrix4.identity()..translateByDouble(0.0, -4.0, 0.0, 1.0))
               : Matrix4.identity(),
           width: MediaQuery.of(context).size.width <= 700 ? 188 : 220,
-          height: MediaQuery.of(context).size.width <= 700 ? 290 : 320,
+          height: MediaQuery.of(context).size.width <= 700 ? 344 : 368,
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(24),
@@ -130,7 +130,7 @@ class _InventoryCardState extends State<InventoryCard> {
                 ),
               ),
 
-              const SizedBox(height: 10),
+              const SizedBox(height: 14),
 
               // =====================
               // BOTÃO ADD AO CARRINHO
@@ -182,7 +182,7 @@ class _InventoryCardState extends State<InventoryCard> {
                   opacity: available ? 1 : 0.6,
                   child: Container(
                     width: double.infinity,
-                    height: 40,
+                    constraints: const BoxConstraints(minHeight: 46),
                     decoration: BoxDecoration(
                       color: available
                           ? Theme.of(context).primaryColor
@@ -190,12 +190,16 @@ class _InventoryCardState extends State<InventoryCard> {
                       borderRadius: BorderRadius.circular(16),
                     ),
                     alignment: Alignment.center,
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 11),
                     child: Text(
                       available ? 'Adicionar ao carrinho' : 'Esgotado',
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
-                        fontSize: 14,
+                        fontSize: 13,
                       ),
                     ),
                   ),

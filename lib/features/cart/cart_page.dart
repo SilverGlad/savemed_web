@@ -17,7 +17,7 @@ class CartPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
     final isDesktop = width >= 1040;
-    final horizontalPadding = width < 640 ? 16.0 : 24.0;
+    final horizontalPadding = width < 640 ? 12.0 : 24.0;
 
     return Scaffold(
       backgroundColor: AppColors.background,

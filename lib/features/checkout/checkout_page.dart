@@ -17,6 +17,7 @@ class CheckoutPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final cart = context.watch<CartController>();
     final auth = context.watch<AuthController>();
+    final isMobile = MediaQuery.of(context).size.width < 640;
 
     if (cart.items.isEmpty) {
       return const Scaffold(body: Center(child: Text('Carrinho vazio')));
@@ -29,7 +30,12 @@ class CheckoutPage extends StatelessWidget {
           SaveMedHeader(),
           Expanded(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(16, 18, 16, 28),
+              padding: EdgeInsets.fromLTRB(
+                isMobile ? 12 : 24,
+                18,
+                isMobile ? 12 : 24,
+                28,
+              ),
               child: Center(
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 1160),

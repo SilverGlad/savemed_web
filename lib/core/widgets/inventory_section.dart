@@ -65,7 +65,7 @@ class _InventorySectionState extends State<InventorySection> {
             const SizedBox(height: 18),
           ],
           SizedBox(
-            height: isMobile ? 308 : 356,
+            height: isMobile ? 356 : 390,
             child: GestureDetector(
               behavior: HitTestBehavior.translucent,
               onHorizontalDragStart: (details) {

@@ -35,7 +35,7 @@ class ProductDetailPage extends StatelessWidget {
           // =====================
           Expanded(
             child: SingleChildScrollView(
-              padding: EdgeInsets.all(isMobile ? 16 : 24),
+              padding: EdgeInsets.all(isMobile ? 12 : 24),
               child: Center(
                 child: Column(
                   children: [
