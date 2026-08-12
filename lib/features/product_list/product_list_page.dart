@@ -38,6 +38,7 @@ class _ProductListPageState extends State<ProductListPage> {
   Widget build(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
     final isDesktop = width > 900;
+    final horizontalPadding = width < 640 ? 12.0 : 24.0;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF4F5F7),
@@ -52,7 +53,7 @@ class _ProductListPageState extends State<ProductListPage> {
                 // TOPO
                 // =====================
                 SliverPadding(
-                  padding: const EdgeInsets.all(24),
+                  padding: EdgeInsets.all(horizontalPadding),
                   sliver: SliverToBoxAdapter(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -71,7 +72,7 @@ class _ProductListPageState extends State<ProductListPage> {
                 // =====================
                 if (isDesktop)
                   SliverPadding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
                     sliver: SliverToBoxAdapter(
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -90,7 +91,12 @@ class _ProductListPageState extends State<ProductListPage> {
                 if (!isDesktop) InventoryGrid(),
 
                 const SliverToBoxAdapter(child: SizedBox(height: 48)),
-                const SliverToBoxAdapter(child: SaveMedFooter()),
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(horizontalPadding, 0, horizontalPadding, 24),
+                    child: const SaveMedFooter(),
+                  ),
+                ),
               ],
             ),
           ),

@@ -1,9 +1,11 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
-import '../theme/app_colors.dart';
+import 'package:SaveMed/core/services/highlight_banner_service.dart';
+import 'package:SaveMed/core/theme/app_colors.dart';
 
 class BannerCarousel extends StatefulWidget {
   const BannerCarousel({super.key});
@@ -13,58 +15,54 @@ class BannerCarousel extends StatefulWidget {
 }
 
 class _BannerCarouselState extends State<BannerCarousel> {
+  final HighlightBannerService _service = HighlightBannerService();
+
   late final PageController _controller;
-  late Timer _timer;
+  Timer? _timer;
 
+  List<String> _banners = [];
+  bool _loading = true;
   int _currentIndex = 0;
-
-  final List<_BannerItem> banners = const [
-    _BannerItem(
-      assetPath: 'assets/banners/banner1.jpg',
-      eyebrow: 'Entrega agil',
-      title: 'Seu cuidado diario sem fila e sem pressa',
-      subtitle: 'Medicamentos, higiene e beleza com experiencia mobile simples.',
-    ),
-    _BannerItem(
-      assetPath: 'assets/banners/banner2.jpg',
-      eyebrow: 'Descontos reais',
-      title: 'Ofertas que fazem sentido para o bolso',
-      subtitle: 'Combine itens essenciais e finalize com poucos toques.',
-    ),
-    _BannerItem(
-      assetPath: 'assets/banners/banner3.jpg',
-      eyebrow: 'Farmacias confiaveis',
-      title: 'Compare opcoes e encontre o melhor estoque',
-      subtitle: 'Mais clareza na busca, mais rapidez no pedido.',
-    ),
-    _BannerItem(
-      assetPath: 'assets/banners/banner4.jpg',
-      eyebrow: 'Experiencia SaveMed',
-      title: 'Cuidado continuo com visual mais leve',
-      subtitle: 'Uma vitrine mais moderna para navegar bem no celular.',
-    ),
-  ];
 
   @override
   void initState() {
     super.initState();
-    _controller = PageController(viewportFraction: 0.94);
-    _timer = Timer.periodic(const Duration(seconds: 5), (_) {
-      if (!_controller.hasClients) return;
-      _currentIndex = (_currentIndex + 1) % banners.length;
-      _controller.animateToPage(
-        _currentIndex,
-        duration: const Duration(milliseconds: 650),
-        curve: Curves.easeInOutCubic,
-      );
-    });
+    _controller = PageController();
+    _loadBanners();
   }
 
   @override
   void dispose() {
-    _timer.cancel();
+    _timer?.cancel();
     _controller.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadBanners() async {
+    try {
+      final banners = await _service.getBannerImages();
+      if (!mounted) return;
+
+      setState(() {
+        _banners = banners;
+        _loading = false;
+      });
+
+      if (banners.length > 1) {
+        _timer = Timer.periodic(const Duration(seconds: 5), (_) {
+          if (!_controller.hasClients || _banners.isEmpty) return;
+          _currentIndex = (_currentIndex + 1) % _banners.length;
+          _controller.animateToPage(
+            _currentIndex,
+            duration: const Duration(milliseconds: 550),
+            curve: Curves.easeInOutCubic,
+          );
+        });
+      }
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+    }
   }
 
   @override
@@ -72,136 +70,61 @@ class _BannerCarouselState extends State<BannerCarousel> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final isMobile = constraints.maxWidth <= 700;
-        final height = isMobile ? 232.0 : constraints.maxWidth * 0.3;
+        final height = isMobile ? 190.0 : 290.0;
+
+        if (_loading) {
+          return _BannerShell(
+            height: height,
+            child: const Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        if (_banners.isEmpty) {
+          return const SizedBox.shrink();
+        }
 
         return Column(
           children: [
-            SizedBox(
-              height: height.clamp(220, 430),
+            _BannerShell(
+              height: height,
               child: ScrollConfiguration(
                 behavior: _MouseDragScrollBehavior(),
                 child: PageView.builder(
                   controller: _controller,
-                  itemCount: banners.length,
+                  itemCount: _banners.length,
                   onPageChanged: (index) {
                     setState(() => _currentIndex = index);
                   },
                   itemBuilder: (_, index) {
-                    final banner = banners[index];
-                    return Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 6),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(30),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.primaryDark.withValues(alpha: 0.18),
-                            blurRadius: 28,
-                            offset: const Offset(0, 14),
-                          ),
-                        ],
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(30),
-                        child: Stack(
-                          fit: StackFit.expand,
-                          children: [
-                            Image.asset(
-                              banner.assetPath,
-                              fit: BoxFit.cover,
-                              alignment: Alignment.centerRight,
-                            ),
-                            Container(
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  begin: Alignment.centerLeft,
-                                  end: Alignment.centerRight,
-                                  colors: [
-                                    AppColors.primaryDark.withValues(alpha: 0.88),
-                                    AppColors.primary.withValues(alpha: 0.54),
-                                    Colors.transparent,
-                                  ],
-                                  stops: const [0.0, 0.42, 1.0],
-                                ),
-                              ),
-                            ),
-                            Padding(
-                              padding: EdgeInsets.all(isMobile ? 22 : 34),
-                              child: ConstrainedBox(
-                                constraints: BoxConstraints(
-                                  maxWidth: isMobile ? 220 : 360,
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  mainAxisAlignment: MainAxisAlignment.end,
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 12,
-                                        vertical: 8,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: AppColors.accent.withValues(alpha: 0.95),
-                                        borderRadius: BorderRadius.circular(999),
-                                      ),
-                                      child: Text(
-                                        banner.eyebrow,
-                                        style: const TextStyle(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w700,
-                                          color: AppColors.textDark,
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(height: 14),
-                                    Text(
-                                      banner.title,
-                                      style: TextStyle(
-                                        fontSize: isMobile ? 28 : 38,
-                                        height: 1.02,
-                                        fontWeight: FontWeight.w700,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 10),
-                                    Text(
-                                      banner.subtitle,
-                                      style: TextStyle(
-                                        fontSize: isMobile ? 13 : 15,
-                                        height: 1.35,
-                                        color: Colors.white.withValues(alpha: 0.9),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+                    return ClipRRect(
+                      borderRadius: BorderRadius.circular(28),
+                      child: _BannerImage(imageSource: _banners[index]),
                     );
                   },
                 ),
               ),
             ),
-            const SizedBox(height: 14),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: List.generate(
-                banners.length,
-                (index) => AnimatedContainer(
-                  duration: const Duration(milliseconds: 280),
-                  margin: const EdgeInsets.symmetric(horizontal: 4),
-                  width: _currentIndex == index ? 24 : 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(99),
-                    color: _currentIndex == index
-                        ? AppColors.primary
-                        : AppColors.primary.withValues(alpha: 0.22),
+            if (_banners.length > 1) ...[
+              const SizedBox(height: 14),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(
+                  _banners.length,
+                  (index) => AnimatedContainer(
+                    duration: const Duration(milliseconds: 240),
+                    margin: const EdgeInsets.symmetric(horizontal: 4),
+                    width: _currentIndex == index ? 22 : 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(999),
+                      color: _currentIndex == index
+                          ? AppColors.primary
+                          : AppColors.primary.withValues(alpha: 0.22),
+                    ),
                   ),
                 ),
               ),
-            ),
+            ],
           ],
         );
       },
@@ -209,25 +132,87 @@ class _BannerCarouselState extends State<BannerCarousel> {
   }
 }
 
+class _BannerImage extends StatelessWidget {
+  final String imageSource;
+
+  const _BannerImage({required this.imageSource});
+
+  @override
+  Widget build(BuildContext context) {
+    if (imageSource.startsWith('data:image')) {
+      final commaIndex = imageSource.indexOf(',');
+      if (commaIndex != -1) {
+        try {
+          final bytes = base64Decode(imageSource.substring(commaIndex + 1));
+          return Image.memory(
+            bytes,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => const _BannerFallback(),
+          );
+        } catch (_) {
+          return const _BannerFallback();
+        }
+      }
+    }
+
+    return Image.network(
+      imageSource,
+      fit: BoxFit.cover,
+      errorBuilder: (_, __, ___) => const _BannerFallback(),
+    );
+  }
+}
+
+class _BannerFallback extends StatelessWidget {
+  const _BannerFallback();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: AppColors.surfaceMuted,
+      alignment: Alignment.center,
+      child: const Icon(
+        Icons.image_not_supported_outlined,
+        size: 38,
+        color: AppColors.primaryDark,
+      ),
+    );
+  }
+}
+
+class _BannerShell extends StatelessWidget {
+  final double height;
+  final Widget child;
+
+  const _BannerShell({
+    required this.height,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: height,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(28),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primaryDark.withValues(alpha: 0.12),
+            blurRadius: 22,
+            offset: const Offset(0, 12),
+          ),
+        ],
+      ),
+      child: child,
+    );
+  }
+}
+
 class _MouseDragScrollBehavior extends MaterialScrollBehavior {
   @override
   Set<PointerDeviceKind> get dragDevices => {
-    PointerDeviceKind.touch,
-    PointerDeviceKind.mouse,
-    PointerDeviceKind.trackpad,
-  };
-}
-
-class _BannerItem {
-  final String assetPath;
-  final String eyebrow;
-  final String title;
-  final String subtitle;
-
-  const _BannerItem({
-    required this.assetPath,
-    required this.eyebrow,
-    required this.title,
-    required this.subtitle,
-  });
+        PointerDeviceKind.touch,
+        PointerDeviceKind.mouse,
+        PointerDeviceKind.trackpad,
+      };
 }

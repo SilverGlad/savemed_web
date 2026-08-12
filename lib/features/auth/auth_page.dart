@@ -29,16 +29,21 @@ class _AuthPageState extends State<AuthPage> {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: Column(
-        children: [
-          const _AuthHeader(),
-          SizedBox(height: isMobile ? 12 : 20),
-          Expanded(
-            child: SingleChildScrollView(
-              padding: EdgeInsets.fromLTRB(isMobile ? 16 : 24, 0, isMobile ? 16 : 24, 24),
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 1180),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1180),
+          child: Column(
+            children: [
+              const _AuthHeader(),
+              SizedBox(height: isMobile ? 12 : 20),
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.fromLTRB(
+                    isMobile ? 12 : 24,
+                    0,
+                    isMobile ? 12 : 24,
+                    24,
+                  ),
                   child: Column(
                     children: [
                       Container(
@@ -105,9 +110,9 @@ class _AuthPageState extends State<AuthPage> {
                   ),
                 ),
               ),
-            ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -171,7 +176,7 @@ class _AuthHeader extends StatelessWidget {
     final isMobile = MediaQuery.of(context).size.width <= 760;
 
     return Container(
-      margin: EdgeInsets.fromLTRB(isMobile ? 12 : 24, 12, isMobile ? 12 : 24, 12),
+      margin: EdgeInsets.fromLTRB(isMobile ? 16 : 24, 12, isMobile ? 16 : 24, 12),
       padding: EdgeInsets.symmetric(
         horizontal: isMobile ? 16 : 22,
         vertical: isMobile ? 14 : 16,

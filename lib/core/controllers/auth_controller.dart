@@ -13,6 +13,8 @@ class AuthController extends ChangeNotifier {
 
   bool get isLogged => token != null;
 
+  String _normalizeEmail(String value) => value.trim().toLowerCase();
+
   Future<void> restoreSession(AddressController addressController) async {
     final savedToken = await TokenStorage.getToken();
 
@@ -41,7 +43,10 @@ class AuthController extends ChangeNotifier {
     String password,
     AddressController addressController,
   ) async {
-    final result = await _service.login(email: email, password: password);
+    final result = await _service.login(
+      email: _normalizeEmail(email),
+      password: password,
+    );
 
     token = result['token'];
     user = result['user'];
@@ -60,10 +65,12 @@ class AuthController extends ChangeNotifier {
     required String document,
     required String phone,
   }) async {
+    final normalizedEmail = _normalizeEmail(email);
+
     if (isCustomer) {
       await _service.registerCustomer(
         name: name,
-        email: email,
+        email: normalizedEmail,
         password: password,
         cpf: document,
         phone: phone,
@@ -71,7 +78,7 @@ class AuthController extends ChangeNotifier {
     } else {
       await _service.registerSeller(
         name: name,
-        email: email,
+        email: normalizedEmail,
         password: password,
         cnpj: document,
         phone: phone,

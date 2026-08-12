@@ -9,6 +9,8 @@ import 'package:SaveMed/core/widgets/savemed_header.dart';
 class AdminPage extends StatelessWidget {
   const AdminPage({super.key});
 
+  static const double _maxContentWidth = 1180;
+
   @override
   Widget build(BuildContext context) {
     final user = context.watch<AuthController>().user ?? {};
@@ -18,17 +20,15 @@ class AdminPage extends StatelessWidget {
 
     final tabs = <Tab>[
       if (isAppAdmin) const Tab(text: 'Farmacias'),
-      const Tab(text: 'Categorias'),
+      if (isAppAdmin) const Tab(text: 'Categorias'),
       const Tab(text: 'Medicamentos'),
-      const Tab(text: 'Inventario'),
       const Tab(text: 'Pedidos'),
     ];
 
     final views = <Widget>[
       if (isAppAdmin) const _PharmaciesTab(),
-      _CategoriesTab(pharmacyId: isAppAdmin ? null : pharmacyId),
+      if (isAppAdmin) _CategoriesTab(pharmacyId: null),
       _MedicationsTab(pharmacyId: isAppAdmin ? null : pharmacyId),
-      _InventoryTab(pharmacyId: isAppAdmin ? null : pharmacyId),
       _OrdersTab(pharmacyId: isAppAdmin ? null : pharmacyId),
     ];
 
@@ -36,42 +36,82 @@ class AdminPage extends StatelessWidget {
       length: tabs.length,
       child: Scaffold(
         backgroundColor: AppColors.background,
-        body: Column(
-          children: [
-            SaveMedHeader(),
-            Expanded(
-              child: Column(
-                children: [
-                  const Padding(
-                    padding: EdgeInsets.fromLTRB(16, 16, 16, 0),
-                    child: _AdminHero(),
+        body: LayoutBuilder(
+          builder: (context, constraints) {
+            final tabViewHeight = (constraints.maxHeight - 340).clamp(420.0, 900.0);
+
+            return SingleChildScrollView(
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxWidth: _maxContentWidth,
+                    minHeight: constraints.maxHeight,
                   ),
-                  Container(
-                    margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(24),
-                      border: Border.all(color: AppColors.border),
-                    ),
-                    child: TabBar(
-                      isScrollable: true,
-                      indicator: BoxDecoration(
-                        color: AppColors.primary,
-                        borderRadius: BorderRadius.circular(16),
+                  child: Column(
+                    children: [
+                      const SaveMedHeader(),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 0, 12, 24),
+                        child: Column(
+                          children: [
+                            const _AdminHero(),
+                            const SizedBox(height: 16),
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(28),
+                                border: Border.all(color: AppColors.border),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.04),
+                                    blurRadius: 18,
+                                    offset: const Offset(0, 10),
+                                  ),
+                                ],
+                              ),
+                              child: TabBar(
+                                isScrollable: true,
+                                tabAlignment: TabAlignment.start,
+                                labelPadding: const EdgeInsets.symmetric(horizontal: 6),
+                                indicator: BoxDecoration(
+                                  color: AppColors.primary,
+                                  borderRadius: BorderRadius.circular(18),
+                                ),
+                                dividerColor: Colors.transparent,
+                                labelColor: Colors.white,
+                                unselectedLabelColor: AppColors.textLight,
+                                tabs: tabs,
+                              ),
+                            ),
+                            const SizedBox(height: 14),
+                            SizedBox(
+                              height: tabViewHeight,
+                              child: Container(
+                                width: double.infinity,
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(28),
+                                  border: Border.all(color: AppColors.border),
+                                ),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(28),
+                                  child: TabBarView(children: views),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 24),
+                            const SaveMedFooter(),
+                          ],
+                        ),
                       ),
-                      dividerColor: Colors.transparent,
-                      labelColor: Colors.white,
-                      unselectedLabelColor: AppColors.textLight,
-                      tabs: tabs,
-                    ),
+                    ],
                   ),
-                  Expanded(child: TabBarView(children: views)),
-                ],
+                ),
               ),
-            ),
-            const SaveMedFooter(),
-          ],
+            );
+          },
         ),
       ),
     );
@@ -90,7 +130,7 @@ class _AdminHero extends StatelessWidget {
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(22),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(28),
         gradient: const LinearGradient(
@@ -185,8 +225,8 @@ class _HeroBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 144,
-      padding: const EdgeInsets.all(14),
+      width: 164,
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(20),
@@ -249,7 +289,7 @@ abstract class _AdminListState<T extends StatefulWidget> extends State<T> {
     String createLabel = 'Novo',
   }) {
     return Padding(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -361,31 +401,29 @@ class _PharmaciesTabState extends _AdminListState<_PharmaciesTab> {
         separatorBuilder: (_, __) => const SizedBox(height: 12),
         itemBuilder: (_, index) {
           final pharmacy = items[index] as Map<String, dynamic>;
-          return Card(
-            child: ListTile(
-              title: Text(pharmacy['NAME']?.toString() ?? 'Farmacia'),
-              subtitle: Text(
-                [
-                  pharmacy['CITY'],
-                  pharmacy['STATE'],
-                  pharmacy['ZIPCODE'],
-                ].whereType<String>().where((e) => e.isNotEmpty).join(' • '),
-              ),
-              trailing: Wrap(
-                spacing: 8,
-                children: [
-                  IconButton(
-                    onPressed: () => _showPharmacyDialog(pharmacy: pharmacy),
-                    icon: const Icon(Icons.edit),
+          return _adminListCard(
+            title: Text(pharmacy['NAME']?.toString() ?? 'Farmacia'),
+            subtitle: Text(
+              [
+                pharmacy['CITY'],
+                pharmacy['STATE'],
+                pharmacy['ZIPCODE'],
+              ].whereType<String>().where((e) => e.isNotEmpty).join(' • '),
+            ),
+            trailing: Wrap(
+              spacing: 8,
+              children: [
+                IconButton(
+                  onPressed: () => _showPharmacyDialog(pharmacy: pharmacy),
+                  icon: const Icon(Icons.edit),
+                ),
+                IconButton(
+                  onPressed: () => handle(
+                    () => service.deletePharmacy(pharmacy['ID'] as int),
                   ),
-                  IconButton(
-                    onPressed: () => handle(
-                      () => service.deletePharmacy(pharmacy['ID'] as int),
-                    ),
-                    icon: const Icon(Icons.delete),
-                  ),
-                ],
-              ),
+                  icon: const Icon(Icons.delete),
+                ),
+              ],
             ),
           );
         },
@@ -424,15 +462,17 @@ class _PharmaciesTabState extends _AdminListState<_PharmaciesTab> {
           FilledButton(
             onPressed: () async {
               Navigator.pop(dialogContext);
+              final payload = <String, dynamic>{
+                'NAME': name.text.trim(),
+                'PHONE': phone.text.trim(),
+                'CITY': city.text.trim(),
+                'STATE': stateCtrl.text.trim(),
+                'ZIPCODE': zip.text.trim(),
+              };
+
               await handle(
                 () => service.savePharmacy(
-                  {
-                    'NAME': name.text,
-                    'PHONE': phone.text,
-                    'CITY': city.text,
-                    'STATE': stateCtrl.text,
-                    'ZIPCODE': zip.text,
-                  },
+                  payload,
                   id: pharmacy?['ID'] as int?,
                 ),
               );
@@ -485,25 +525,23 @@ class _CategoriesTabState extends _AdminListState<_CategoriesTab> {
         itemBuilder: (_, index) {
           final category = items[index] as Map<String, dynamic>;
           final subcategories = category['subcategories'] as List? ?? [];
-          return Card(
-            child: ListTile(
-              title: Text(category['NAME']?.toString() ?? 'Categoria'),
-              subtitle: Text('${subcategories.length} subcategorias'),
-              trailing: Wrap(
-                spacing: 8,
-                children: [
-                  IconButton(
-                    onPressed: () => _showCategoryDialog(category: category),
-                    icon: const Icon(Icons.edit),
+          return _adminListCard(
+            title: Text(category['NAME']?.toString() ?? 'Categoria'),
+            subtitle: Text('${subcategories.length} subcategorias'),
+            trailing: Wrap(
+              spacing: 8,
+              children: [
+                IconButton(
+                  onPressed: () => _showCategoryDialog(category: category),
+                  icon: const Icon(Icons.edit),
+                ),
+                IconButton(
+                  onPressed: () => handle(
+                    () => service.deleteCategory(category['ID'] as int),
                   ),
-                  IconButton(
-                    onPressed: () => handle(
-                      () => service.deleteCategory(category['ID'] as int),
-                    ),
-                    icon: const Icon(Icons.delete),
-                  ),
-                ],
-              ),
+                  icon: const Icon(Icons.delete),
+                ),
+              ],
             ),
           );
         },
@@ -560,7 +598,7 @@ class _MedicationsTab extends StatefulWidget {
   const _MedicationsTab({required this.pharmacyId});
 
   @override
-  State<_MedicationsTab> createState() => _MedicationsTabState();
+  State<_MedicationsTab> createState() => _MedicationsManagementState();
 }
 
 class _MedicationsTabState extends _AdminListState<_MedicationsTab> {
@@ -593,27 +631,25 @@ class _MedicationsTabState extends _AdminListState<_MedicationsTab> {
         separatorBuilder: (_, __) => const SizedBox(height: 12),
         itemBuilder: (_, index) {
           final medication = items[index] as Map<String, dynamic>;
-          return Card(
-            child: ListTile(
-              title: Text(medication['NAME']?.toString() ?? 'Medicamento'),
-              subtitle: Text(
-                'Farmacia ${medication['PHARMACY_ID']} • Categoria ${medication['CATEGORY_ID']}',
-              ),
-              trailing: Wrap(
-                spacing: 8,
-                children: [
-                  IconButton(
-                    onPressed: () => _showMedicationDialog(medication: medication),
-                    icon: const Icon(Icons.edit),
+          return _adminListCard(
+            title: Text(medication['NAME']?.toString() ?? 'Medicamento'),
+            subtitle: Text(
+              'Farmacia ${medication['PHARMACY_ID']} • Categoria ${medication['CATEGORY_ID']}',
+            ),
+            trailing: Wrap(
+              spacing: 8,
+              children: [
+                IconButton(
+                  onPressed: () => _showMedicationDialog(medication: medication),
+                  icon: const Icon(Icons.edit),
+                ),
+                IconButton(
+                  onPressed: () => handle(
+                    () => service.deleteMedication(medication['ID'] as int),
                   ),
-                  IconButton(
-                    onPressed: () => handle(
-                      () => service.deleteMedication(medication['ID'] as int),
-                    ),
-                    icon: const Icon(Icons.delete),
-                  ),
-                ],
-              ),
+                  icon: const Icon(Icons.delete),
+                ),
+              ],
             ),
           );
         },
@@ -681,6 +717,255 @@ class _MedicationsTabState extends _AdminListState<_MedicationsTab> {
   }
 }
 
+class _MedicationsManagementState extends _AdminListState<_MedicationsTab> {
+  List<dynamic> _categories = [];
+  List<dynamic> _subcategories = [];
+  Map<int, Map<String, dynamic>> _inventoryByMedicationId = {};
+
+  @override
+  void initState() {
+    super.initState();
+    reload();
+  }
+
+  @override
+  Future<void> reload() async {
+    setState(() => loading = true);
+    try {
+      final results = await Future.wait([
+        service.listMedications(pharmacyId: widget.pharmacyId),
+        service.listCategories(),
+        service.listInventory(pharmacyId: widget.pharmacyId),
+      ]);
+
+      items = results[0] as List<dynamic>;
+      _categories = results[1] as List<dynamic>;
+      _subcategories = _categories
+          .cast<Map<String, dynamic>>()
+          .expand(
+            (category) => ((category['subcategories'] as List?) ?? const [])
+                .cast<Map<String, dynamic>>(),
+          )
+          .toList();
+
+      final inventoryItems = results[2] as List<dynamic>;
+      _inventoryByMedicationId = {
+        for (final item in inventoryItems.cast<Map<String, dynamic>>())
+          if (item['MEDICATION_ID'] is int) item['MEDICATION_ID'] as int: item,
+      };
+    } catch (e) {
+      error = e.toString();
+    }
+
+    if (!mounted) return;
+    setState(() => loading = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return buildScaffold(
+      title: 'Medicamentos',
+      description: 'Cadastre medicamento, categoria, estoque e preco promocional no mesmo fluxo.',
+      onCreate: () => _showMedicationDialog(),
+      child: ListView.separated(
+        itemCount: items.length,
+        separatorBuilder: (_, __) => const SizedBox(height: 12),
+        itemBuilder: (_, index) {
+          final medication = items[index] as Map<String, dynamic>;
+          final inventory = _inventoryByMedicationId[medication['ID'] as int? ?? -1];
+          final categoryName = _lookupName(_categories, medication['CATEGORY_ID']);
+          final subcategoryName = _lookupName(_subcategories, medication['SUBCATEGORY_ID']);
+
+          return _adminListCard(
+            title: Text(medication['NAME']?.toString() ?? 'Medicamento'),
+            subtitle: Text(
+              [
+                'Categoria $categoryName',
+                if (subcategoryName != '-') 'Subcategoria $subcategoryName',
+                if (inventory?['STOCK'] != null) 'Estoque ${inventory?['STOCK']}',
+                if (inventory?['PRICE'] != null) 'Preco R\$ ${inventory?['PRICE']}',
+                if (inventory?['ORIGINAL_PRICE'] != null &&
+                    inventory?['PRICE'] != null &&
+                    inventory!['ORIGINAL_PRICE'].toString() !=
+                        inventory['PRICE'].toString())
+                  'De R\$ ${inventory['ORIGINAL_PRICE']}',
+              ].join(' • '),
+            ),
+            trailing: Wrap(
+              spacing: 8,
+              children: [
+                IconButton(
+                  onPressed: () => _showMedicationDialog(medication: medication),
+                  icon: const Icon(Icons.edit),
+                ),
+                IconButton(
+                  onPressed: () => handle(
+                    () => service.deleteMedication(medication['ID'] as int),
+                  ),
+                  icon: const Icon(Icons.delete),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Future<void> _showMedicationDialog({Map<String, dynamic>? medication}) async {
+    final existingInventory = medication == null
+        ? null
+        : _inventoryByMedicationId[medication['ID'] as int? ?? -1];
+    final resolvedPharmacyId = widget.pharmacyId ?? medication?['PHARMACY_ID'] as int?;
+    final isScopedToPharmacy = widget.pharmacyId != null;
+    final name = TextEditingController(text: medication?['NAME']?.toString() ?? '');
+    final description = TextEditingController(
+      text: medication?['DESCRIPTION']?.toString() ?? '',
+    );
+    final pharmacyId = TextEditingController(
+      text: (resolvedPharmacyId)?.toString() ?? '',
+    );
+    final price = TextEditingController(text: existingInventory?['PRICE']?.toString() ?? '');
+    final originalPrice = TextEditingController(
+      text: existingInventory?['ORIGINAL_PRICE']?.toString() ?? '',
+    );
+    final stock = TextEditingController(text: existingInventory?['STOCK']?.toString() ?? '');
+    int? selectedCategoryId = medication?['CATEGORY_ID'] as int?;
+    int? selectedSubcategoryId = medication?['SUBCATEGORY_ID'] as int?;
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            final filteredSubcategories = _subcategories
+                .cast<Map<String, dynamic>>()
+                .where((item) => item['CATEGORY_ID'] == selectedCategoryId)
+                .toList();
+
+            if (!filteredSubcategories.any((item) => item['ID'] == selectedSubcategoryId)) {
+              selectedSubcategoryId = null;
+            }
+
+            return AlertDialog(
+              title: Text(medication == null ? 'Novo medicamento' : 'Editar medicamento'),
+              content: SingleChildScrollView(
+                child: SizedBox(
+                  width: 420,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _input(name, 'Nome'),
+                      _input(description, 'Descricao'),
+                      if (!isScopedToPharmacy) _input(pharmacyId, 'ID da farmacia'),
+                      DropdownButtonFormField<int>(
+                        value: selectedCategoryId,
+                        decoration: _selectDecoration('Categoria'),
+                        items: _categories
+                            .cast<Map<String, dynamic>>()
+                            .map(
+                              (item) => DropdownMenuItem<int>(
+                                value: item['ID'] as int,
+                                child: Text(item['NAME']?.toString() ?? 'Categoria'),
+                              ),
+                            )
+                            .toList(),
+                        onChanged: (value) {
+                          setDialogState(() {
+                            selectedCategoryId = value;
+                            selectedSubcategoryId = null;
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<int>(
+                        value: selectedSubcategoryId,
+                        decoration: _selectDecoration('Subcategoria'),
+                        items: filteredSubcategories
+                            .map(
+                              (item) => DropdownMenuItem<int>(
+                                value: item['ID'] as int,
+                                child: Text(item['NAME']?.toString() ?? 'Subcategoria'),
+                              ),
+                            )
+                            .toList(),
+                        onChanged: filteredSubcategories.isEmpty
+                            ? null
+                            : (value) => setDialogState(() {
+                                  selectedSubcategoryId = value;
+                                }),
+                      ),
+                      const SizedBox(height: 12),
+                      _input(price, 'Preco atual'),
+                      _input(originalPrice, 'Preco original'),
+                      _input(stock, 'Estoque'),
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  child: const Text('Cancelar'),
+                ),
+                FilledButton(
+                  onPressed: () async {
+                    Navigator.pop(dialogContext);
+                    await handle(() async {
+                      final pharmacyIdValue = isScopedToPharmacy
+                          ? resolvedPharmacyId
+                          : int.tryParse(pharmacyId.text);
+
+                      if (pharmacyIdValue == null) {
+                        throw Exception('Selecione uma farmacia valida para o medicamento.');
+                      }
+
+                      final savedMedication = await service.saveMedication(
+                        {
+                          'NAME': name.text,
+                          'DESCRIPTION': description.text,
+                          'PHARMACY_ID': pharmacyIdValue,
+                          'CATEGORY_ID': selectedCategoryId,
+                          'SUBCATEGORY_ID': selectedSubcategoryId,
+                        },
+                        id: medication?['ID'] as int?,
+                      );
+
+                      await service.saveInventory(
+                        {
+                          'PHARMACY_ID': pharmacyIdValue,
+                          'MEDICATION_ID': savedMedication['ID'],
+                          'PRICE': double.tryParse(price.text) ?? 0,
+                          'ORIGINAL_PRICE': double.tryParse(originalPrice.text) ??
+                              double.tryParse(price.text) ??
+                              0,
+                          'STOCK': int.tryParse(stock.text) ?? 0,
+                        },
+                        id: existingInventory?['ID'] as int?,
+                      );
+                    });
+                  },
+                  child: const Text('Salvar'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  String _lookupName(List<dynamic> source, dynamic id) {
+    if (id == null) return '-';
+    for (final item in source.cast<Map<String, dynamic>>()) {
+      if (item['ID'] == id) {
+        return item['NAME']?.toString() ?? '-';
+      }
+    }
+    return '-';
+  }
+}
+
 class _InventoryTab extends StatefulWidget {
   final int? pharmacyId;
 
@@ -721,27 +1006,25 @@ class _InventoryTabState extends _AdminListState<_InventoryTab> {
         itemBuilder: (_, index) {
           final inventory = items[index] as Map<String, dynamic>;
           final med = (inventory['Medication'] ?? inventory['medication']) as Map<String, dynamic>?;
-          return Card(
-            child: ListTile(
-              title: Text(med?['NAME']?.toString() ?? 'Item'),
-              subtitle: Text(
-                'Farmacia ${inventory['PHARMACY_ID']} • Estoque ${inventory['STOCK']} • R\$ ${inventory['PRICE']}',
-              ),
-              trailing: Wrap(
-                spacing: 8,
-                children: [
-                  IconButton(
-                    onPressed: () => _showInventoryDialog(inventory: inventory),
-                    icon: const Icon(Icons.edit),
+          return _adminListCard(
+            title: Text(med?['NAME']?.toString() ?? 'Item'),
+            subtitle: Text(
+              'Farmacia ${inventory['PHARMACY_ID']} • Estoque ${inventory['STOCK']} • R\$ ${inventory['PRICE']}',
+            ),
+            trailing: Wrap(
+              spacing: 8,
+              children: [
+                IconButton(
+                  onPressed: () => _showInventoryDialog(inventory: inventory),
+                  icon: const Icon(Icons.edit),
+                ),
+                IconButton(
+                  onPressed: () => handle(
+                    () => service.deleteInventory(inventory['ID'] as int),
                   ),
-                  IconButton(
-                    onPressed: () => handle(
-                      () => service.deleteInventory(inventory['ID'] as int),
-                    ),
-                    icon: const Icon(Icons.delete),
-                  ),
-                ],
-              ),
+                  icon: const Icon(Icons.delete),
+                ),
+              ],
             ),
           );
         },
@@ -847,27 +1130,25 @@ class _OrdersTabState extends _AdminListState<_OrdersTab> {
         itemBuilder: (_, index) {
           final order = items[index] as Map<String, dynamic>;
           final pharmacyName = order['pharmacy']?['NAME'] ?? 'Farmacia';
-          return Card(
-            child: ListTile(
-              title: Text('Pedido #${order['ID']} • $pharmacyName'),
-              subtitle: Text(
-                'Status ${order['STATUS']} • Pagamento ${order['PAYMENT_STATUS']} • Total R\$ ${order['TOTAL_AMOUNT']}',
-              ),
-              trailing: Wrap(
-                spacing: 8,
-                children: [
-                  IconButton(
-                    onPressed: () => _showOrderDialog(order),
-                    icon: const Icon(Icons.edit),
+          return _adminListCard(
+            title: Text('Pedido #${order['ID']} • $pharmacyName'),
+            subtitle: Text(
+              'Status ${order['STATUS']} • Pagamento ${order['PAYMENT_STATUS']} • Total R\$ ${order['TOTAL_AMOUNT']}',
+            ),
+            trailing: Wrap(
+              spacing: 8,
+              children: [
+                IconButton(
+                  onPressed: () => _showOrderDialog(order),
+                  icon: const Icon(Icons.edit),
+                ),
+                TextButton(
+                  onPressed: () => handle(
+                    () => service.refundOrder(order['ID'] as int),
                   ),
-                  TextButton(
-                    onPressed: () => handle(
-                      () => service.refundOrder(order['ID'] as int),
-                    ),
-                    child: const Text('Estornar'),
-                  ),
-                ],
-              ),
+                  child: const Text('Estornar'),
+                ),
+              ],
             ),
           );
         },
@@ -925,7 +1206,90 @@ Widget _input(TextEditingController controller, String label) {
       controller: controller,
       decoration: InputDecoration(
         labelText: label,
-        border: const OutlineInputBorder(),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(18),
+        ),
+      ),
+    ),
+  );
+}
+
+InputDecoration _selectDecoration(String label) {
+  return InputDecoration(
+    labelText: label,
+    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(18),
+    ),
+  );
+}
+
+Widget _adminListCard({
+  required Widget title,
+  Widget? subtitle,
+  required Widget trailing,
+}) {
+  return Card(
+    elevation: 0,
+    margin: EdgeInsets.zero,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(22),
+      side: const BorderSide(color: AppColors.border),
+    ),
+    child: Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final stackActions = constraints.maxWidth < 760;
+
+          if (stackActions) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                title,
+                if (subtitle != null) ...[
+                  const SizedBox(height: 6),
+                  DefaultTextStyle.merge(
+                    style: const TextStyle(
+                      color: AppColors.textLight,
+                      height: 1.4,
+                    ),
+                    child: subtitle,
+                  ),
+                ],
+                const SizedBox(height: 14),
+                Align(alignment: Alignment.centerLeft, child: trailing),
+              ],
+            );
+          }
+
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    title,
+                    if (subtitle != null) ...[
+                      const SizedBox(height: 6),
+                      DefaultTextStyle.merge(
+                        style: const TextStyle(
+                          color: AppColors.textLight,
+                          height: 1.4,
+                        ),
+                        child: subtitle,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(width: 16),
+              trailing,
+            ],
+          );
+        },
       ),
     ),
   );

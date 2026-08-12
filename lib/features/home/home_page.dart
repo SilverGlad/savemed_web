@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:SaveMed/core/controllers/home_inventory_controller.dart';
-import 'package:SaveMed/core/widgets/savemed_footer.dart';
 
-import '../../core/widgets/banner_carousel.dart';
-import '../../core/widgets/category_section.dart';
-import '../../core/widgets/savemed_header.dart';
-import '../../core/widgets/inventory_section.dart';
-import '../../core/theme/app_colors.dart';
+import 'package:SaveMed/core/controllers/home_inventory_controller.dart';
+import 'package:SaveMed/core/widgets/banner_carousel.dart';
+import 'package:SaveMed/core/widgets/category_section.dart';
+import 'package:SaveMed/core/widgets/inventory_section.dart';
+import 'package:SaveMed/core/widgets/savemed_footer.dart';
+import 'package:SaveMed/core/widgets/savemed_header.dart';
+import 'package:SaveMed/core/theme/app_colors.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -17,6 +17,8 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
+  static const double _maxContentWidth = 1280;
+
   @override
   void initState() {
     super.initState();
@@ -28,127 +30,83 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    final width = MediaQuery.of(context).size.width;
-    final isMobile = width <= 600;
+    final isMobile = MediaQuery.of(context).size.width <= 600;
 
     return Scaffold(
       backgroundColor: AppColors.background,
       body: CustomScrollView(
         slivers: [
-          const SliverToBoxAdapter(child: SaveMedHeader()),
-
+          SliverToBoxAdapter(child: _pageContent(const SaveMedHeader())),
           SliverToBoxAdapter(
-            child: Padding(
-              padding: EdgeInsets.fromLTRB(
-                isMobile ? 12 : 24,
-                0,
-                isMobile ? 12 : 24,
-                18,
-              ),
-              child: Container(
-                padding: EdgeInsets.all(isMobile ? 20 : 28),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [AppColors.primaryDark, AppColors.primary],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(30),
+            child: _pageContent(
+              Padding(
+                padding: EdgeInsets.fromLTRB(
+                  isMobile ? 12 : 24,
+                  0,
+                  isMobile ? 12 : 24,
+                  18,
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.accent,
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: const Text(
-                        'App com foco mobile',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.textDark,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    Text(
-                      'Sua farmácia digital com navegação mais leve e direta.',
-                      style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                        color: Colors.white,
-                        fontSize: isMobile ? 28 : 34,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      'Busque, compare e finalize pedidos com uma interface pensada primeiro para o celular.',
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.88),
-                        height: 1.4,
-                        fontSize: isMobile ? 14 : 15,
-                      ),
-                    ),
-                  ],
+                child: BannerCarousel(),
+              ),
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: _pageContent(const CategorySection()),
+          ),
+          SliverToBoxAdapter(
+            child: _pageContent(
+              Consumer<HomeInventoryController>(
+                builder: (_, ctrl, __) => InventorySection(
+                  title: 'Ofertas em destaque',
+                  items: ctrl.highlights,
                 ),
               ),
             ),
           ),
-
           SliverToBoxAdapter(
-            child: Padding(
-              padding: EdgeInsets.symmetric(
-                horizontal: isMobile ? 0 : 0,
-                vertical: isMobile ? 0 : 0,
-              ),
-              child: const BannerCarousel(),
-            ),
-          ),
-
-          const SliverToBoxAdapter(child: CategorySection()),
-
-          SliverToBoxAdapter(
-            child: Consumer<HomeInventoryController>(
-              builder: (_, ctrl, __) => InventorySection(
-                title: 'Ofertas em destaque',
-                items: ctrl.highlights,
+            child: _pageContent(
+              Consumer<HomeInventoryController>(
+                builder: (_, ctrl, __) => InventorySection(
+                  title: 'Medicamentos',
+                  items: ctrl.products,
+                ),
               ),
             ),
           ),
-
           SliverToBoxAdapter(
-            child: Consumer<HomeInventoryController>(
-              builder: (_, ctrl, __) => InventorySection(
-                title: 'Medicamentos',
-                items: ctrl.products,
+            child: _pageContent(
+              Consumer<HomeInventoryController>(
+                builder: (_, ctrl, __) => InventorySection(
+                  title: 'Mais vendidos',
+                  items: ctrl.bestSellers,
+                ),
               ),
             ),
           ),
-
           SliverToBoxAdapter(
-            child: Consumer<HomeInventoryController>(
-              builder: (_, ctrl, __) => InventorySection(
-                title: 'Mais vendidos',
-                items: ctrl.bestSellers,
+            child: _pageContent(
+              Padding(
+                padding: EdgeInsets.fromLTRB(
+                  isMobile ? 12 : 24,
+                  10,
+                  isMobile ? 12 : 24,
+                  30,
+                ),
+                child: SaveMedFooter(),
               ),
-            ),
-          ),
-
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: EdgeInsets.fromLTRB(
-                isMobile ? 12 : 24,
-                10,
-                isMobile ? 12 : 24,
-                isMobile ? 20 : 30,
-              ),
-              child: const SaveMedFooter(),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _pageContent(Widget child) {
+    return Align(
+      alignment: Alignment.topCenter,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: _maxContentWidth),
+        child: child,
       ),
     );
   }

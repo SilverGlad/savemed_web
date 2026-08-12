@@ -88,6 +88,7 @@ class _PaymentPageState extends State<PaymentPage> {
     final total = cart.subtotal + _shippingPrice(cart.selectedShipping);
     final width = MediaQuery.of(context).size.width;
     final isDesktop = width >= 960;
+    final horizontalPadding = width < 640 ? 12.0 : 24.0;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -96,7 +97,7 @@ class _PaymentPageState extends State<PaymentPage> {
           SaveMedHeader(),
           Expanded(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(16, 18, 16, 28),
+              padding: EdgeInsets.fromLTRB(horizontalPadding, 18, horizontalPadding, 28),
               child: Center(
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 1140),

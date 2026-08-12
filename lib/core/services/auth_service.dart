@@ -2,6 +2,8 @@ import 'dart:convert';
 import '../api/api_client.dart';
 
 class AuthService {
+  String _normalizeEmail(String value) => value.trim().toLowerCase();
+
   // =====================
   // LOGIN
   // =====================
@@ -10,7 +12,7 @@ class AuthService {
     required String password,
   }) async {
     final response = await ApiClient.post('/users/login', {
-      'EMAIL': email,
+      'EMAIL': _normalizeEmail(email),
       'PASSWORD': password,
     });
 
@@ -45,7 +47,7 @@ class AuthService {
   }) async {
     final response = await ApiClient.post('/users/register', {
       'NAME': name,
-      'EMAIL': email,
+      'EMAIL': _normalizeEmail(email),
       'PASSWORD': password,
       'USER_ROLE': 'customer',
       'CPF': cpf.replaceAll(RegExp(r'\D'), ''),
@@ -72,7 +74,7 @@ class AuthService {
   }) async {
     final response = await ApiClient.post('/users/register', {
       'NAME': name,
-      'EMAIL': email,
+      'EMAIL': _normalizeEmail(email),
       'PASSWORD': password,
       'USER_ROLE': 'pharmacy_admin',
       'CPF': cnpj.replaceAll(RegExp(r'\D'), ''),

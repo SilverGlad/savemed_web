@@ -40,6 +40,11 @@ class AdminService {
     _ensureSuccess(response.statusCode, response.body, fallback: 'Erro ao remover categoria');
   }
 
+  Future<List<dynamic>> listSubcategories() async {
+    final res = await ApiClient.get('/subcategories');
+    return _decodeList(res, 'Erro ao buscar subcategorias');
+  }
+
   Future<List<dynamic>> listMedications({int? pharmacyId}) async {
     final res = await ApiClient.get(
       '/medications',
@@ -48,11 +53,12 @@ class AdminService {
     return _decodeList(res, 'Erro ao buscar medicamentos');
   }
 
-  Future<void> saveMedication(Map<String, dynamic> data, {int? id}) async {
+  Future<Map<String, dynamic>> saveMedication(Map<String, dynamic> data, {int? id}) async {
     final response = id == null
         ? await ApiClient.post('/medications', data)
         : await ApiClient.put('/medications/$id', data);
     _ensureSuccess(response.statusCode, response.body, fallback: 'Erro ao salvar medicamento');
+    return jsonDecode(response.body) as Map<String, dynamic>;
   }
 
   Future<void> deleteMedication(int id) async {
@@ -67,11 +73,12 @@ class AdminService {
     return _decodeList(res, 'Erro ao buscar inventario');
   }
 
-  Future<void> saveInventory(Map<String, dynamic> data, {int? id}) async {
+  Future<Map<String, dynamic>> saveInventory(Map<String, dynamic> data, {int? id}) async {
     final response = id == null
         ? await ApiClient.post('/inventory', data)
         : await ApiClient.put('/inventory/$id', data);
     _ensureSuccess(response.statusCode, response.body, fallback: 'Erro ao salvar item do inventario');
+    return jsonDecode(response.body) as Map<String, dynamic>;
   }
 
   Future<void> deleteInventory(int id) async {
