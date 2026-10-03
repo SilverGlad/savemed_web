@@ -22,6 +22,27 @@ void main() {
         OrderStatusRules.allowedPaymentTransitions(PaymentStatus.refunded),
         [PaymentStatus.refunded],
       );
+      expect(
+        OrderStatusRules.canRefund(
+          orderStatus: OrderStatus.confirmed,
+          paymentStatus: PaymentStatus.paid,
+        ),
+        isTrue,
+      );
+      expect(
+        OrderStatusRules.canRefund(
+          orderStatus: OrderStatus.canceled,
+          paymentStatus: PaymentStatus.paid,
+        ),
+        isFalse,
+      );
+      expect(
+        OrderStatusRules.canRefund(
+          orderStatus: OrderStatus.confirmed,
+          paymentStatus: PaymentStatus.refunded,
+        ),
+        isFalse,
+      );
     });
 
     test('allows pending payment outcomes', () {

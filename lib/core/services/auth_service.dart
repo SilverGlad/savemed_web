@@ -1,8 +1,14 @@
 import '../api/api_client.dart';
 import '../api/api_response.dart';
+import '../../models/pharmacy_registration_request.dart';
+import '../../models/pharmacy_access_request.dart';
+import '../../models/pharmacy_search_result.dart';
+import '../../models/user.dart';
 
 class AuthService {
-  Future<Map<String, dynamic>> login({
+  const AuthService();
+
+  Future<AuthSession> login({
     required String email,
     required String password,
   }) async {
@@ -10,19 +16,40 @@ class AuthService {
       'EMAIL': email,
       'PASSWORD': password,
     });
-    return ApiResponse.object(
-      response,
-      expectedStatusCodes: {200},
-      fallback: 'Erro ao fazer login',
+    return AuthSession.fromJson(
+      ApiResponse.object(
+        response,
+        expectedStatusCodes: {200},
+        fallback: 'Erro ao fazer login',
+      ),
     );
   }
 
-  Future<Map<String, dynamic>> me() async {
+  Future<AppUser> me() async {
     final response = await ApiClient.get('/users/me');
-    return ApiResponse.object(
-      response,
-      expectedStatusCodes: {200},
-      fallback: 'Token invalido',
+    return AppUser.fromJson(
+      ApiResponse.object(
+        response,
+        expectedStatusCodes: {200},
+        fallback: 'Token inválido',
+      ),
+    );
+  }
+
+  Future<AppUser> updateProfile({
+    required String name,
+    required String phone,
+  }) async {
+    final response = await ApiClient.put('/users/me', {
+      'NAME': name.trim(),
+      'PHONE_NUMBER': phone.replaceAll(RegExp(r'\D'), ''),
+    });
+    return AppUser.fromJson(
+      ApiResponse.object(
+        response,
+        expectedStatusCodes: {200},
+        fallback: 'Não foi possível salvar seus dados.',
+      ),
     );
   }
 
@@ -33,9 +60,9 @@ class AuthService {
     final data = ApiResponse.object(
       response,
       expectedStatusCodes: {200},
-      fallback: 'Erro ao solicitar recuperacao de senha',
+      fallback: 'Erro ao solicitar recuperação de senha',
     );
-    return (data['message'] ?? 'Codigo enviado com sucesso').toString();
+    return (data['message'] ?? 'Código enviado com sucesso').toString();
   }
 
   Future<String> resetPassword({
@@ -89,44 +116,52 @@ class AuthService {
     required String state,
     required String zipcode,
   }) async {
-    final pharmacyResponse = await ApiClient.post('/pharmacies', {
-      'NAME': pharmacyName,
-      'CNPJ': cnpj.replaceAll(RegExp(r'\D'), ''),
-      'PHONE': phone.replaceAll(RegExp(r'\D'), ''),
-      'CITY': city.trim(),
-      'STATE': state.trim().toUpperCase(),
-      'ZIPCODE': zipcode.replaceAll(RegExp(r'\D'), ''),
-    });
-    final pharmacyData = ApiResponse.object(
-      pharmacyResponse,
-      expectedStatusCodes: {201},
-      fallback: 'Erro ao criar farmacia',
+    final request = PharmacyRegistrationRequest(
+      administratorName: name,
+      email: email,
+      password: password,
+      cnpj: cnpj,
+      phone: phone,
+      pharmacyName: pharmacyName,
+      city: city,
+      state: state,
+      zipcode: zipcode,
     );
-    final pharmacyId = pharmacyData['ID'];
-    if (pharmacyId == null) throw Exception('Resposta invalida do servidor.');
+    final response = await ApiClient.post(
+      '/pharmacies/register',
+      request.toJson(),
+    );
+    return ApiResponse.object(
+      response,
+      expectedStatusCodes: {201},
+      fallback: 'Erro ao criar conta da farmácia',
+    );
+  }
 
-    final response = await ApiClient.post('/users/register', {
-      'NAME': name,
-      'EMAIL': email,
-      'PASSWORD': password,
-      'USER_ROLE': 'pharmacy_admin',
-      'PHARMACY_ID': pharmacyId,
-      'PHONE_NUMBER': phone.replaceAll(RegExp(r'\D'), ''),
-    });
+  Future<List<PharmacySearchResult>> searchPharmaciesForAccess(
+    String query,
+  ) async {
+    final response = await ApiClient.get(
+      '/access-requests/pharmacies?q=${Uri.encodeQueryComponent(query.trim())}',
+    );
+    final data = ApiResponse.list(
+      response,
+      expectedStatusCodes: {200},
+      fallback: 'Erro ao buscar farmácias',
+    );
+    return data
+        .whereType<Map<String, dynamic>>()
+        .map(PharmacySearchResult.fromJson)
+        .toList();
+  }
 
-    try {
-      return ApiResponse.object(
-        response,
-        expectedStatusCodes: {201},
-        fallback: 'Erro ao criar conta',
-      );
-    } catch (_) {
-      try {
-        await ApiClient.delete('/pharmacies/$pharmacyId');
-      } catch (_) {
-        // O backend deve oferecer criacao transacional para eliminar este fallback.
-      }
-      rethrow;
-    }
+  Future<String> requestPharmacyAccess(PharmacyAccessRequest request) async {
+    final response = await ApiClient.post('/access-requests', request.toJson());
+    final data = ApiResponse.object(
+      response,
+      expectedStatusCodes: {201},
+      fallback: 'Erro ao solicitar acesso',
+    );
+    return data['message']?.toString() ?? 'Solicitação enviada com sucesso.';
   }
 }

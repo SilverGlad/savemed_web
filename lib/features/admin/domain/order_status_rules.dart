@@ -35,6 +35,14 @@ abstract final class OrderStatusRules {
     };
   }
 
+  static bool canRefund({
+    required OrderStatus orderStatus,
+    required PaymentStatus paymentStatus,
+  }) {
+    return paymentStatus == PaymentStatus.paid &&
+        orderStatus != OrderStatus.canceled;
+  }
+
   static String label(String value) {
     return orderStatusLabel(value);
   }

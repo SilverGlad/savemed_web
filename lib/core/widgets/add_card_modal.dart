@@ -15,17 +15,57 @@ class AddCardModal extends StatefulWidget {
   State<AddCardModal> createState() => _AddCardModalState();
 }
 
-class _AddCardModalState extends State<AddCardModal> {
+class _AddCardModalState extends State<AddCardModal>
+    with WidgetsBindingObserver {
+  final _formKey = GlobalKey<FormState>();
   final _numberCtrl = TextEditingController();
   final _nameCtrl = TextEditingController();
-  final _cpfCtrl = TextEditingController();
   final _expCtrl = TextEditingController();
   final _cvvCtrl = TextEditingController();
 
   String _brand = '';
   String _last4 = '••••';
+  String? _securityMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _clearEntryFields();
+    _numberCtrl.dispose();
+    _nameCtrl.dispose();
+    _expCtrl.dispose();
+    _cvvCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed || !mounted) return;
+    _clearEntryFields(resetForm: true);
+    setState(() {
+      _securityMessage =
+          'Por segurança, os dados do cartão foram apagados. Insira novamente para continuar.';
+    });
+  }
+
+  void _clearEntryFields({bool resetForm = false}) {
+    if (resetForm) _formKey.currentState?.reset();
+    _numberCtrl.clear();
+    _nameCtrl.clear();
+    _expCtrl.clear();
+    _cvvCtrl.clear();
+    _brand = '';
+    _last4 = '••••';
+  }
 
   void _updateCardPreview() {
+    _securityMessage = null;
     final number = _numberCtrl.text.replaceAll(RegExp(r'\D'), '');
 
     if (number.isNotEmpty) {
@@ -49,110 +89,169 @@ class _AddCardModalState extends State<AddCardModal> {
     return '';
   }
 
+  String? _validateCardNumber(String? value) {
+    final number = (value ?? '').replaceAll(RegExp(r'\D'), '');
+    if (number.length < 13 || number.length > 19) {
+      return 'O número deve ter entre 13 e 19 dígitos.';
+    }
+
+    var sum = 0;
+    var doubleDigit = false;
+    for (var index = number.length - 1; index >= 0; index--) {
+      var digit = int.parse(number[index]);
+      if (doubleDigit) {
+        digit *= 2;
+        if (digit > 9) digit -= 9;
+      }
+      sum += digit;
+      doubleDigit = !doubleDigit;
+    }
+    return sum % 10 == 0 ? null : 'Confira o número do cartão.';
+  }
+
+  String? _validateExpiration(String? value) {
+    final parts = (value ?? '').split('/');
+    if (parts.length != 2 || parts[0].length != 2 || parts[1].length != 2) {
+      return 'Informe a validade no formato MM/AA.';
+    }
+    final month = int.tryParse(parts[0]);
+    final shortYear = int.tryParse(parts[1]);
+    if (month == null || month < 1 || month > 12 || shortYear == null) {
+      return 'Informe um mês entre 01 e 12.';
+    }
+
+    final year = 2000 + shortYear;
+    final now = DateTime.now();
+    if (year < now.year || (year == now.year && month < now.month)) {
+      return 'Este cartão está vencido.';
+    }
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
+    final isNarrow = MediaQuery.sizeOf(context).width < 400;
+    final expirationField = TextFormField(
+      controller: _expCtrl,
+      keyboardType: TextInputType.number,
+      inputFormatters: [
+        FilteringTextInputFormatter.digitsOnly,
+        expiryDateFormatter,
+      ],
+      decoration: const InputDecoration(
+        labelText: 'Validade',
+        hintText: 'MM/AA',
+      ),
+      onChanged: (_) => setState(() => _securityMessage = null),
+      validator: _validateExpiration,
+    );
+    final cvvField = TextFormField(
+      controller: _cvvCtrl,
+      keyboardType: TextInputType.number,
+      obscureText: true,
+      inputFormatters: [
+        FilteringTextInputFormatter.digitsOnly,
+        LengthLimitingTextInputFormatter(4),
+      ],
+      decoration: const InputDecoration(labelText: 'CVV'),
+      onChanged: (_) => setState(() => _securityMessage = null),
+      validator: (value) {
+        final cvv = value ?? '';
+        return cvv.length == 3 || cvv.length == 4
+            ? null
+            : 'Informe um CVV de 3 ou 4 dígitos.';
+      },
+    );
+
     return AlertDialog(
       insetPadding: const EdgeInsets.all(16),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       title: const Text('Adicionar cartão'),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _CardPreview(
-              brand: _brand,
-              last4: _last4,
-              name: _nameCtrl.text,
-              exp: _expCtrl.text,
-            ),
-
-            const SizedBox(height: 16),
-
-            TextField(
-              controller: _numberCtrl,
-              keyboardType: TextInputType.number,
-              inputFormatters: [
-                FilteringTextInputFormatter.digitsOnly,
-                TextInputFormatter.withFunction((oldValue, newValue) {
-                  final digits = newValue.text.replaceAll(RegExp(r'\D'), '');
-                  var spaced = '';
-
-                  for (int i = 0; i < digits.length && i < 16; i++) {
-                    if (i % 4 == 0 && i != 0) spaced += ' ';
-                    spaced += digits[i];
-                  }
-
-                  return TextEditingValue(
-                    text: spaced,
-                    selection: TextSelection.collapsed(offset: spaced.length),
-                  );
-                }),
-              ],
-              decoration: const InputDecoration(
-                labelText: 'Número do cartão',
-                hintText: '0000 0000 0000 0000',
+      content: Form(
+        key: _formKey,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _CardPreview(
+                brand: _brand,
+                last4: _last4,
+                name: _nameCtrl.text,
+                exp: _expCtrl.text,
               ),
-              onChanged: (_) => _updateCardPreview(),
-            ),
 
-            const SizedBox(height: 12),
-
-            TextField(
-              controller: _nameCtrl,
-              decoration: const InputDecoration(labelText: 'Nome do titular'),
-              onChanged: (_) => setState(() {}),
-            ),
-
-            const SizedBox(height: 12),
-
-            TextField(
-              controller: _cpfCtrl,
-              keyboardType: TextInputType.number,
-              inputFormatters: [
-                FilteringTextInputFormatter.digitsOnly,
-                cpfFormatter,
-              ],
-              decoration: const InputDecoration(
-                labelText: 'CPF',
-                hintText: '000.000.000-00',
-              ),
-            ),
-
-            const SizedBox(height: 12),
-
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _expCtrl,
-                    keyboardType: TextInputType.number,
-                    inputFormatters: [
-                      FilteringTextInputFormatter.digitsOnly,
-                      expiryDateFormatter,
-                    ],
-                    decoration: const InputDecoration(
-                      labelText: 'Validade',
-                      hintText: 'MM/AA',
-                    ),
-                    onChanged: (_) => setState(() {}),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: TextField(
-                    controller: _cvvCtrl,
-                    keyboardType: TextInputType.number,
-                    obscureText: true,
-                    inputFormatters: [
-                      FilteringTextInputFormatter.digitsOnly,
-                      LengthLimitingTextInputFormatter(4),
-                    ],
-                    decoration: const InputDecoration(labelText: 'CVV'),
+              if (_securityMessage != null) ...[
+                const SizedBox(height: 12),
+                Semantics(
+                  liveRegion: true,
+                  child: Text(
+                    _securityMessage!,
+                    key: const ValueKey('card-security-message'),
+                    style: const TextStyle(color: Colors.deepOrange),
                   ),
                 ),
               ],
-            ),
-          ],
+
+              const SizedBox(height: 16),
+
+              TextFormField(
+                controller: _numberCtrl,
+                keyboardType: TextInputType.number,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                  TextInputFormatter.withFunction((oldValue, newValue) {
+                    final digits = newValue.text.replaceAll(RegExp(r'\D'), '');
+                    var spaced = '';
+
+                    for (int i = 0; i < digits.length && i < 19; i++) {
+                      if (i % 4 == 0 && i != 0) spaced += ' ';
+                      spaced += digits[i];
+                    }
+
+                    return TextEditingValue(
+                      text: spaced,
+                      selection: TextSelection.collapsed(offset: spaced.length),
+                    );
+                  }),
+                ],
+                decoration: const InputDecoration(
+                  labelText: 'Número do cartão',
+                  hintText: '0000 0000 0000 0000',
+                ),
+                onChanged: (_) => _updateCardPreview(),
+                validator: _validateCardNumber,
+              ),
+
+              const SizedBox(height: 12),
+
+              TextFormField(
+                controller: _nameCtrl,
+                decoration: const InputDecoration(labelText: 'Nome do titular'),
+                validator: (value) {
+                  final name = (value ?? '').trim();
+                  if (name.length < 2) return 'Informe o nome do titular.';
+                  if (name.length > 64) return 'Use até 64 caracteres.';
+                  return null;
+                },
+                onChanged: (_) => setState(() => _securityMessage = null),
+              ),
+
+              const SizedBox(height: 12),
+
+              if (isNarrow) ...[
+                expirationField,
+                const SizedBox(height: 12),
+                cvvField,
+              ] else
+                Row(
+                  children: [
+                    Expanded(child: expirationField),
+                    const SizedBox(width: 12),
+                    Expanded(child: cvvField),
+                  ],
+                ),
+            ],
+          ),
         ),
       ),
       actions: [
@@ -161,12 +260,11 @@ class _AddCardModalState extends State<AddCardModal> {
           child: const Text('Cancelar'),
         ),
         SaveMedButton(
-          label: 'Salvar cartão',
+          label: 'Usar cartão',
           onPressed: () {
+            if (!(_formKey.currentState?.validate() ?? false)) return;
             final number = _numberCtrl.text.replaceAll(RegExp(r'\D'), '');
             final exp = _expCtrl.text.split('/');
-
-            if (number.length < 12 || exp.length != 2) return;
 
             final card = PaymentCard(
               id: const Uuid().v4(),
@@ -238,11 +336,15 @@ class _CardPreview extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                name.isEmpty ? 'NOME DO TITULAR' : name.toUpperCase(),
-                style: const TextStyle(color: Colors.white),
+              Expanded(
+                child: Text(
+                  name.isEmpty ? 'NOME DO TITULAR' : name.toUpperCase(),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: Colors.white),
+                ),
               ),
-              SizedBox(width: 8),
+              const SizedBox(width: 8),
               Text(
                 exp.isEmpty ? 'MM/AA' : exp,
                 style: const TextStyle(color: Colors.white),

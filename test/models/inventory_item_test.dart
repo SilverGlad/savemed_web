@@ -23,6 +23,7 @@ void main() {
     expect(item.id, 10);
     expect(item.medication.subcategoryId, isNull);
     expect(item.medication.requiresPrescription, isTrue);
+    expect(item.medication.image, isNull);
   });
 
   test('accepts numeric fields represented as strings', () {
@@ -46,5 +47,59 @@ void main() {
     expect(item.stock, 42);
     expect(item.medication.description, isEmpty);
     expect(item.medication.subcategoryId, 9);
+  });
+
+  test('rejects non-finite inventory prices', () {
+    expect(
+      () => InventoryItem.fromJson({
+        'ID': 8,
+        'PRICE': 'NaN',
+        'STOCK': 1,
+        'Pharmacy': {'ID': 2, 'NAME': 'Farmacia'},
+        'Medication': {'ID': 8, 'NAME': 'Produto'},
+      }),
+      throwsFormatException,
+    );
+  });
+
+  test('a paused pharmacy makes its products unavailable for purchase', () {
+    final item = InventoryItem.fromJson({
+      'ID': 9,
+      'PRICE': 10,
+      'STOCK': 3,
+      'Pharmacy': {'ID': 2, 'NAME': 'Farmacia', 'IS_OPEN': false},
+      'Medication': {'ID': 31, 'NAME': 'Produto', 'CATEGORY_ID': 3},
+    });
+
+    expect(item.pharmacy.isOpen, isFalse);
+    expect(item.available, isFalse);
+    expect(item.unavailableLabel, 'Loja fechada');
+  });
+
+  test('resolves legacy and relative images through the current API', () {
+    Map<String, dynamic> inventoryWithImage(Object image) => {
+      'ID': 8,
+      'PRICE': 10,
+      'STOCK': 2,
+      'Pharmacy': {'ID': 2, 'NAME': 'Farmacia'},
+      'Medication': {
+        'ID': 31,
+        'NAME': 'Produto',
+        'CATEGORY_ID': 3,
+        'IMAGE': image,
+      },
+    };
+
+    final relative = InventoryItem.fromJson(inventoryWithImage('produto.jpg'));
+    final legacy = InventoryItem.fromJson(
+      inventoryWithImage(
+        'https://bravelight.com.br/savemed/images/produto.jpg',
+      ),
+    );
+
+    const currentImage =
+        'https://api-savemed-146487220267.southamerica-east1.run.app/api/medications/31/image';
+    expect(relative.medication.image, currentImage);
+    expect(legacy.medication.image, currentImage);
   });
 }

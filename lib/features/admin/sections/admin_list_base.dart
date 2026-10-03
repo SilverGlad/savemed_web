@@ -2,18 +2,24 @@ part of '../admin_page.dart';
 
 abstract class _AdminListPage extends StatefulWidget {
   final int? pharmacyId;
+  final AdminService service;
 
-  const _AdminListPage({this.pharmacyId});
+  const _AdminListPage({this.pharmacyId, required this.service});
 }
 
-abstract class _AdminListPageState<T extends _AdminListPage> extends State<T> {
-  final AdminService service = AdminService();
+abstract class _AdminListPageState<T extends _AdminListPage, I>
+    extends State<T> {
+  AdminService get service => widget.service;
   final TextEditingController search = TextEditingController();
   bool loading = true;
-  String? error;
-  List<dynamic> items = [];
+  Object? error;
+  List<I> items = [];
   int page = 0;
   int _loadGeneration = 0;
+  late final Object _sessionScope;
+  late final AuthController _auth;
+  bool get hasCurrentAdminSession =>
+      mounted && _adminScope(_auth.user) == _sessionScope;
   static const pageSize = 20;
 
   String get title;
@@ -21,16 +27,18 @@ abstract class _AdminListPageState<T extends _AdminListPage> extends State<T> {
   String get createLabel => 'Novo';
   bool get canCreate => true;
 
-  Future<List<dynamic>> fetch();
-  Widget buildMobileItem(Map<String, dynamic> item);
-  DataRow buildRow(Map<String, dynamic> item);
+  Future<List<I>> fetch();
+  Widget buildMobileItem(I item);
+  DataRow buildRow(I item);
   List<DataColumn> get columns;
-  bool matches(Map<String, dynamic> item, String query);
+  bool matches(I item, String query);
   Future<void> onCreate();
 
   @override
   void initState() {
     super.initState();
+    _auth = context.read<AuthController>();
+    _sessionScope = _adminScope(_auth.user);
     search.addListener(() => setState(() => page = 0));
     reload();
   }
@@ -42,6 +50,7 @@ abstract class _AdminListPageState<T extends _AdminListPage> extends State<T> {
   }
 
   Future<void> reload() async {
+    if (!hasCurrentAdminSession) return;
     final generation = ++_loadGeneration;
     setState(() {
       loading = true;
@@ -49,34 +58,42 @@ abstract class _AdminListPageState<T extends _AdminListPage> extends State<T> {
     });
     try {
       final loadedItems = await fetch();
-      if (!mounted || generation != _loadGeneration) return;
+      if (!hasCurrentAdminSession || generation != _loadGeneration) return;
       setState(() {
         items = loadedItems;
         loading = false;
       });
     } catch (e) {
-      if (!mounted || generation != _loadGeneration) return;
+      if (!hasCurrentAdminSession || generation != _loadGeneration) return;
       setState(() {
-        error = e.toString();
+        error = e;
         loading = false;
       });
     }
   }
 
-  Future<bool> handle(Future<void> Function() action) async {
+  Future<bool> handle(
+    Future<void> Function() action, {
+    String Function()? successMessage,
+  }) async {
+    if (!hasCurrentAdminSession) return false;
+    final messenger = ScaffoldMessenger.of(context);
     try {
       await action();
+      if (!hasCurrentAdminSession) return false;
       await reload();
-      if (!mounted) return false;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Alteracao salva com sucesso.')),
+      if (!hasCurrentAdminSession) return false;
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            successMessage?.call() ?? 'Alteracao salva com sucesso.',
+          ),
+        ),
       );
       return true;
     } catch (e) {
-      if (!mounted) return false;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(_cleanError(e))));
+      if (!hasCurrentAdminSession) return false;
+      messenger.showSnackBar(SnackBar(content: Text(_cleanError(e))));
       return false;
     }
   }
@@ -88,9 +105,9 @@ abstract class _AdminListPageState<T extends _AdminListPage> extends State<T> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Confirmar exclusao'),
+        title: const Text('Confirmar exclusão'),
         content: Text(
-          'Deseja excluir $itemLabel? Esta acao nao pode ser desfeita.',
+          'Deseja excluir $itemLabel? Esta ação não pode ser desfeita.',
         ),
         actions: [
           TextButton(
@@ -108,15 +125,17 @@ abstract class _AdminListPageState<T extends _AdminListPage> extends State<T> {
     if (confirmed == true && mounted) await handle(action);
   }
 
-  Future<List<dynamic>?> loadOptions(
-    Future<List<dynamic>> request,
+  Future<List<O>?> loadOptions<O>(
+    Future<List<O>> request,
     String errorMessage,
   ) async {
+    final messenger = ScaffoldMessenger.of(context);
     try {
-      return await request;
+      final options = await request;
+      return hasCurrentAdminSession ? options : null;
     } catch (error) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+      if (hasCurrentAdminSession) {
+        messenger.showSnackBar(
           SnackBar(content: Text('$errorMessage ${_cleanError(error)}')),
         );
       }
@@ -124,10 +143,9 @@ abstract class _AdminListPageState<T extends _AdminListPage> extends State<T> {
     }
   }
 
-  List<Map<String, dynamic>> get filteredItems {
+  List<I> get filteredItems {
     final query = search.text.trim().toLowerCase();
     return items
-        .whereType<Map<String, dynamic>>()
         .where((item) => query.isEmpty || matches(item, query))
         .toList();
   }
@@ -169,13 +187,23 @@ abstract class _AdminListPageState<T extends _AdminListPage> extends State<T> {
         children: [
           _ToolbarSearch(controller: search),
           const SizedBox(height: 12),
-          if (error != null) _InlineError(message: _cleanError(error!)),
-          if (error != null) const SizedBox(height: 12),
           Expanded(
             child: loading
                 ? const _LoadingPanel()
+                : error != null
+                ? _LoadErrorPanel(message: _cleanError(error!), onRetry: reload)
                 : data.isEmpty
-                ? const _EmptyPanel()
+                ? _EmptyPanel(
+                    title: search.text.trim().isEmpty
+                        ? 'Nenhum registro cadastrado.'
+                        : 'Nenhum resultado encontrado.',
+                    actionLabel: search.text.trim().isEmpty && canCreate
+                        ? createLabel
+                        : null,
+                    onAction: search.text.trim().isEmpty && canCreate
+                        ? onCreate
+                        : null,
+                  )
                 : Column(
                     children: [
                       Expanded(
@@ -207,10 +235,13 @@ abstract class _AdminListPageState<T extends _AdminListPage> extends State<T> {
     );
   }
 
-  bool textMatch(Map<String, dynamic> item, String query) {
-    return item.values.any(
-      (value) => value?.toString().toLowerCase().contains(query) ?? false,
-    );
+  bool textMatch(Object item, String query) {
+    if (item is Map) {
+      return item.values.any(
+        (value) => value?.toString().toLowerCase().contains(query) ?? false,
+      );
+    }
+    return item.toString().toLowerCase().contains(query);
   }
 
   DataRow decorateRow(DataRow row, int index) {
@@ -253,18 +284,18 @@ class _PaginationBar extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
           Text(
-            '$totalItems registros - Pagina ${currentPage + 1} de $pageCount',
+            '$totalItems registros - Página ${currentPage + 1} de $pageCount',
             style: const TextStyle(color: _AdminColors.muted, fontSize: 12),
           ),
           const SizedBox(width: 12),
           IconButton(
             onPressed: onPrevious,
-            tooltip: 'Pagina anterior',
+            tooltip: 'Página anterior',
             icon: const Icon(Icons.chevron_left),
           ),
           IconButton(
             onPressed: onNext,
-            tooltip: 'Proxima pagina',
+            tooltip: 'Próxima página',
             icon: const Icon(Icons.chevron_right),
           ),
         ],
@@ -292,35 +323,49 @@ class _AdminPageFrame extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       child: Column(
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final heading = Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      color: _AdminColors.text,
+                      fontSize: 22,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(
+                      color: _AdminColors.muted,
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              );
+              final controls = Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: actions,
+              );
+              if (constraints.maxWidth < 700) {
+                return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        color: _AdminColors.text,
-                        fontSize: 22,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      subtitle,
-                      style: const TextStyle(
-                        color: _AdminColors.muted,
-                        fontSize: 13,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 12),
-              Wrap(spacing: 8, runSpacing: 8, children: actions),
-            ],
+                  children: [heading, const SizedBox(height: 12), controls],
+                );
+              }
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: heading),
+                  const SizedBox(width: 16),
+                  controls,
+                ],
+              );
+            },
           ),
           const SizedBox(height: 14),
           Expanded(child: child),
@@ -343,7 +388,7 @@ class _ToolbarSearch extends StatelessWidget {
         controller: controller,
         decoration: InputDecoration(
           prefixIcon: const Icon(Icons.search, size: 18),
-          hintText: 'Buscar nesta secao',
+          hintText: 'Buscar nesta seção',
           filled: true,
           fillColor: Colors.white,
           contentPadding: const EdgeInsets.symmetric(horizontal: 12),
@@ -361,11 +406,11 @@ class _ToolbarSearch extends StatelessWidget {
   }
 }
 
-class _ResponsiveDataView extends StatelessWidget {
-  final List<Map<String, dynamic>> items;
+class _ResponsiveDataView<I> extends StatelessWidget {
+  final List<I> items;
   final List<DataColumn> columns;
-  final DataRow Function(Map<String, dynamic>, int) buildRow;
-  final Widget Function(Map<String, dynamic>) buildMobileItem;
+  final DataRow Function(I, int) buildRow;
+  final Widget Function(I) buildMobileItem;
 
   const _ResponsiveDataView({
     required this.items,
@@ -402,11 +447,11 @@ class _ResponsiveDataView extends StatelessWidget {
                     child: DataTable(
                       showCheckboxColumn: false,
                       showBottomBorder: true,
-                      columnSpacing: 34,
+                      columnSpacing: 20,
                       horizontalMargin: 18,
                       dividerThickness: 0.8,
-                      dataRowMinHeight: 58,
-                      dataRowMaxHeight: 66,
+                      dataRowMinHeight: 84,
+                      dataRowMaxHeight: 96,
                       headingRowHeight: 46,
                       headingRowColor: WidgetStateProperty.all(
                         const Color(0xFFF3F6F7),

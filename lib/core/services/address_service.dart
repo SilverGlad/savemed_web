@@ -1,31 +1,38 @@
 import '../api/api_client.dart';
 import '../api/api_response.dart';
+import '../../models/postal_address.dart';
 
 class AddressService {
-  Future<List<dynamic>> getUserAddresses(int userId) async {
+  Future<List<PostalAddress>> getUserAddresses(int userId) async {
     final response = await ApiClient.get('/addresses/user/$userId');
-    return ApiResponse.list(
+    return ApiResponse.objects(
       response,
       expectedStatusCodes: {200},
-      fallback: 'Erro ao buscar enderecos',
-    );
+      fallback: 'Erro ao buscar endereços',
+    ).map(PostalAddress.fromJson).toList(growable: false);
   }
 
-  Future<void> createAddress(Map<String, dynamic> data) async {
-    final response = await ApiClient.post('/addresses', data);
+  Future<void> createAddress(PostalAddress address) async {
+    final response = await ApiClient.post(
+      '/addresses',
+      address.toRequestJson(),
+    );
     ApiResponse.success(
       response,
       expectedStatusCodes: {201},
-      fallback: 'Erro ao criar endereco',
+      fallback: 'Erro ao criar endereço',
     );
   }
 
-  Future<void> updateAddress(int id, Map<String, dynamic> data) async {
-    final response = await ApiClient.put('/addresses/$id', data);
+  Future<void> updateAddress(int id, PostalAddress address) async {
+    final response = await ApiClient.put(
+      '/addresses/$id',
+      address.toRequestJson(),
+    );
     ApiResponse.success(
       response,
       expectedStatusCodes: {200},
-      fallback: 'Erro ao atualizar endereco',
+      fallback: 'Erro ao atualizar endereço',
     );
   }
 
@@ -34,7 +41,7 @@ class AddressService {
     ApiResponse.success(
       response,
       expectedStatusCodes: {200, 204},
-      fallback: 'Erro ao remover endereco',
+      fallback: 'Erro ao remover endereço',
     );
   }
 }

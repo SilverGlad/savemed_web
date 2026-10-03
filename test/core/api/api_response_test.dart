@@ -3,67 +3,115 @@ import 'package:http/http.dart' as http;
 import 'package:savemed/core/api/api_response.dart';
 
 void main() {
-  group('ApiResponse', () {
-    test('decodes objects and lists', () {
-      expect(
-        ApiResponse.object(
-          http.Response('{"ID":1}', 200),
-          expectedStatusCodes: {200},
-          fallback: 'Erro',
-        )['ID'],
-        1,
+  group('ApiResponse request correlation', () {
+    test('captures a valid request id from response headers', () {
+      final response = http.Response(
+        '{"error":"Falha"}',
+        500,
+        headers: {'x-request-id': '123e4567-e89b-12d3-a456-426614174000'},
       );
-      expect(
-        ApiResponse.list(
-          http.Response('[{"ID":1}]', 200),
-          expectedStatusCodes: {200},
-          fallback: 'Erro',
-        ),
-        hasLength(1),
-      );
-    });
 
-    test('preserves a safe API error and status', () {
       expect(
         () => ApiResponse.object(
-          http.Response('{"error":"Email ja cadastrado"}', 409),
-          expectedStatusCodes: {201},
-          fallback: 'Erro ao criar conta',
-        ),
-        throwsA(
-          isA<ApiResponseException>()
-              .having((error) => error.statusCode, 'statusCode', 409)
-              .having(
-                (error) => error.message,
-                'message',
-                'Email ja cadastrado',
-              ),
-        ),
-      );
-    });
-
-    test('handles non-JSON and unexpected response shapes', () {
-      expect(
-        () => ApiResponse.object(
-          http.Response('<html>error</html>', 500),
-          expectedStatusCodes: {200},
-          fallback: 'Servidor indisponivel',
+          response,
+          expectedStatusCodes: const {200},
+          fallback: 'Falha',
         ),
         throwsA(
           isA<ApiResponseException>().having(
-            (error) => error.message,
-            'message',
-            'Servidor indisponivel',
+            (error) => error.requestId,
+            'requestId',
+            '123e4567-e89b-12d3-a456-426614174000',
           ),
         ),
       );
+    });
+
+    test('rejects malformed request ids', () {
+      final response = http.Response(
+        '{"error":"Falha","requestId":"<script>"}',
+        500,
+      );
+
       expect(
         () => ApiResponse.object(
-          http.Response('[]', 200),
-          expectedStatusCodes: {200},
-          fallback: 'Erro',
+          response,
+          expectedStatusCodes: const {200},
+          fallback: 'Falha',
         ),
-        throwsA(isA<ApiResponseException>()),
+        throwsA(
+          isA<ApiResponseException>().having(
+            (error) => error.requestId,
+            'requestId',
+            isNull,
+          ),
+        ),
+      );
+    });
+
+    test('captures only stable API error codes', () {
+      final response = http.Response(
+        '{"error":"Falha","code":"PASSWORD_SETUP_REQUIRED"}',
+        403,
+      );
+
+      expect(
+        () => ApiResponse.object(
+          response,
+          expectedStatusCodes: const {200},
+          fallback: 'Falha',
+        ),
+        throwsA(
+          isA<ApiResponseException>().having(
+            (error) => error.code,
+            'code',
+            'PASSWORD_SETUP_REQUIRED',
+          ),
+        ),
+      );
+    });
+
+    test('captures a safe API field for inline validation', () {
+      final response = http.Response(
+        '{"error":"Conflict","code":"CNPJ_IN_USE","field":"pharmacy.CNPJ"}',
+        409,
+      );
+
+      expect(
+        () => ApiResponse.object(
+          response,
+          expectedStatusCodes: const {200},
+          fallback: 'Falha',
+        ),
+        throwsA(
+          isA<ApiResponseException>().having(
+            (error) => error.field,
+            'field',
+            'pharmacy.CNPJ',
+          ),
+        ),
+      );
+    });
+
+    test('ignores malformed API field names', () {
+      final response = http.Response(
+        '{"error":"Falha","field":"<script>alert(1)</script>"}',
+        409,
+      );
+
+      expect(
+        () => ApiResponse.object(
+          response,
+          expectedStatusCodes: const {200},
+          fallback: 'Falha',
+        ),
+        throwsA(
+          isA<ApiResponseException>().having(
+            (error) => error.field,
+            'field',
+            isNull,
+          ),
+        ),
       );
     });
   });

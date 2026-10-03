@@ -43,7 +43,7 @@ String orderStatusLabel(String value) {
     'paid' => 'Pago',
     'failed' => 'Falhou',
     'refunded' => 'Estornado',
-    'completed' => 'Concluido',
+    'completed' => 'Concluído',
     _ => value,
   };
 }

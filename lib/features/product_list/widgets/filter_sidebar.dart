@@ -22,7 +22,7 @@ class FilterSidebar extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: SingleChildScrollView(
         child: Column(

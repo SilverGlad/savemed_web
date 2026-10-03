@@ -1,10 +1,10 @@
 part of '../admin_page.dart';
 
 class _PharmacyUsersDialog extends StatefulWidget {
-  final Map<String, dynamic> pharmacy;
+  final Pharmacy pharmacy;
   final AdminService service;
   final VoidCallback onCreateUser;
-  final ValueChanged<Map<String, dynamic>> onResetUser;
+  final ValueChanged<AppUser> onResetUser;
 
   const _PharmacyUsersDialog({
     required this.pharmacy,
@@ -18,7 +18,7 @@ class _PharmacyUsersDialog extends StatefulWidget {
 }
 
 class _PharmacyUsersDialogState extends State<_PharmacyUsersDialog> {
-  late Future<List<dynamic>> usersFuture;
+  late Future<List<AppUser>> usersFuture;
 
   @override
   void initState() {
@@ -26,23 +26,84 @@ class _PharmacyUsersDialogState extends State<_PharmacyUsersDialog> {
     usersFuture = _loadUsers();
   }
 
-  Future<List<dynamic>> _loadUsers() =>
-      widget.service.listPharmacyUsers(widget.pharmacy['ID'] as int);
+  Future<List<AppUser>> _loadUsers() =>
+      widget.service.listPharmacyUsers(widget.pharmacy.id);
 
   void _reload() {
     setState(() => usersFuture = _loadUsers());
+  }
+
+  Future<void> _toggleStatus(AppUser user) async {
+    final isActive = user.isActive;
+    final nextActive = !isActive;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(nextActive ? 'Ativar usuário?' : 'Inativar usuário?'),
+        content: Text(
+          nextActive
+              ? '${user.name} poderá acessar novamente o painel da farmácia.'
+              : '${user.name} perderá o acesso ao painel imediatamente. Pedidos e histórico serão preservados.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: Text(nextActive ? 'Ativar' : 'Inativar'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    try {
+      await widget.service.updateUserStatus(user.id, isActive: nextActive);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            nextActive
+                ? 'Usuário ativado com sucesso.'
+                : 'Usuário inativado com sucesso.',
+          ),
+        ),
+      );
+      _reload();
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(_cleanError(error))));
+    }
+  }
+
+  Future<void> _resendInvitation(AppUser user) async {
+    try {
+      await widget.service.resendUserInvitation(user.id);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Convite reenviado com sucesso.')),
+      );
+      _reload();
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(_cleanError(error))));
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-      title: Text(
-        'Usuarios - ${_str(widget.pharmacy['NAME'], fallback: 'Farmacia')}',
-      ),
+      title: Text('Usuários - ${widget.pharmacy.name}'),
       content: SizedBox(
         width: 620,
-        child: FutureBuilder<List<dynamic>>(
+        child: FutureBuilder<List<AppUser>>(
           future: usersFuture,
           builder: (context, snapshot) {
             if (snapshot.connectionState != ConnectionState.done) {
@@ -66,22 +127,24 @@ class _PharmacyUsersDialogState extends State<_PharmacyUsersDialog> {
                       widget.onCreateUser();
                     },
                     icon: const Icon(Icons.person_add_alt_outlined, size: 18),
-                    label: const Text('Criar usuario admin'),
+                    label: const Text('Convidar usuário'),
                   ),
                 ),
                 const SizedBox(height: 12),
                 if (users.isEmpty)
                   const _InfoPanel(
                     icon: Icons.person_off_outlined,
-                    title: 'Nenhum usuario vinculado',
+                    title: 'Nenhum usuário vinculado',
                     body:
-                        'Esta farmacia ainda nao possui usuarios administrativos cadastrados.',
+                        'Esta farmácia ainda não possui usuários administrativos cadastrados.',
                   )
                 else
                   ...users.map(
                     (user) => _PharmacyUserTile(
-                      user: user as Map<String, dynamic>,
+                      user: user,
                       onReset: () => widget.onResetUser(user),
+                      onResendInvitation: () => _resendInvitation(user),
+                      onToggleStatus: () => _toggleStatus(user),
                     ),
                   ),
               ],

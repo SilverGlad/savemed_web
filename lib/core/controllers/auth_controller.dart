@@ -1,47 +1,119 @@
 import 'package:flutter/material.dart';
 import 'package:savemed/core/auth/user_role.dart';
 import 'package:savemed/core/api/api_client.dart';
+import 'package:savemed/core/api/api_response.dart';
 import 'package:savemed/core/controllers/address_controller.dart';
+import 'package:savemed/core/controllers/card_controller.dart';
+import 'package:savemed/core/controllers/cart_controller.dart';
+import 'package:savemed/core/controllers/order_controller.dart';
+import 'package:savemed/core/controllers/payment_controller.dart';
+import 'package:savemed/core/logging/app_logger.dart';
+import 'package:savemed/models/user.dart';
 
 import '../services/auth_service.dart';
 import '../storage/token_storage.dart';
+import '../storage/card_storage.dart';
 
 class AuthController extends ChangeNotifier {
-  final _service = AuthService();
+  final AuthService _service;
+  final CardController? _cards;
+  final CartController? _cart;
+  final OrderController? _orders;
+  final PaymentController? _payments;
+  AddressController? _addresses;
 
-  Map<String, dynamic>? user;
+  AppUser? user;
   String? token;
+  String? sessionRestoreError;
+  bool sessionExpired = false;
   bool loading = true;
+  bool _restoringSession = false;
+  int _sessionGeneration = 0;
 
-  AuthController() {
-    ApiClient.setUnauthorizedHandler(_expireSession);
+  AuthController({
+    AuthService? service,
+    CardController? cards,
+    CartController? cart,
+    OrderController? orders,
+    PaymentController? payments,
+  }) : _service = service ?? AuthService(),
+       _cards = cards,
+       _cart = cart,
+       _orders = orders,
+       _payments = payments {
+    ApiClient.setUnauthorizedHandler(expireSession);
   }
 
-  bool get isLogged => token != null;
-  UserRole get role => UserRole.fromApi(user?['USER_ROLE']);
+  bool get isLogged => token != null && user != null;
+  UserRole get role => user?.role ?? UserRole.unknown;
   bool get isAdmin => role.isAdmin;
 
   String _normalizeEmail(String value) => value.trim().toLowerCase();
 
   Future<void> restoreSession(AddressController addressController) async {
-    try {
-      final savedToken = await TokenStorage.getToken();
+    _addresses = addressController;
+    if (_restoringSession) return;
+    final generation = ++_sessionGeneration;
+    _restoringSession = true;
 
-      if (savedToken != null) {
-        token = savedToken;
-        user = await _service.me();
-        if (!isAdmin) {
-          await addressController.load(user!['ID']);
-        }
+    final wasLoading = loading;
+    loading = true;
+    sessionRestoreError = null;
+    if (!wasLoading) notifyListeners();
+
+    try {
+      _cards?.clearForSessionRestore();
+      try {
+        await CardStorage.clear();
+      } catch (_) {
+        AppLogger.event(AppLogEvent.cardDataCleanupFailed);
       }
-    } catch (e) {
-      debugPrint('Nao foi possivel restaurar a sessao.');
+      if (generation != _sessionGeneration) return;
+
+      final savedToken = await TokenStorage.getToken();
+      if (generation != _sessionGeneration) return;
+
+      if (savedToken == null) {
+        token = null;
+        user = null;
+        return;
+      }
+
+      token = savedToken;
+      final restoredUser = await _service.me();
+      if (generation != _sessionGeneration) return;
+      user = restoredUser;
+      await _loadAddresses(addressController);
+    } on ApiResponseException catch (error) {
+      if (generation != _sessionGeneration) return;
       token = null;
       user = null;
-      await TokenStorage.clear();
+
+      if (error.isUnauthorized ||
+          error.isForbidden ||
+          error.statusCode == 404) {
+        await TokenStorage.clear();
+      } else {
+        sessionRestoreError = _sessionRestoreFailureMessage;
+      }
+    } on ApiConnectionException {
+      if (generation != _sessionGeneration) return;
+      token = null;
+      user = null;
+      sessionRestoreError = _sessionRestoreFailureMessage;
+    } catch (_) {
+      if (generation != _sessionGeneration) return;
+      token = null;
+      user = null;
+      sessionRestoreError = _sessionRestoreFailureMessage;
+      AppLogger.event(AppLogEvent.sessionRestoreFailed);
     } finally {
-      loading = false;
-      notifyListeners();
+      _restoringSession = false;
+      if (generation == _sessionGeneration) {
+        if (user == null) addressController.clear();
+        loading = false;
+        notifyListeners();
+      }
     }
   }
 
@@ -50,19 +122,31 @@ class AuthController extends ChangeNotifier {
     String password,
     AddressController addressController,
   ) async {
+    _addresses = addressController;
+    final generation = ++_sessionGeneration;
     final result = await _service.login(
       email: _normalizeEmail(email),
       password: password,
     );
+    if (generation != _sessionGeneration) return;
 
-    token = result['token'];
-    user = result['user'];
+    _cards?.clear();
+    _cart?.clear();
+    _orders?.clear();
+    _payments?.clear();
+    await CardStorage.clear();
+    if (generation != _sessionGeneration) return;
+
+    token = result.token;
+    user = result.user;
+    sessionRestoreError = null;
+    sessionExpired = false;
 
     await TokenStorage.saveToken(token!);
-    if (!isAdmin) {
-      await addressController.load(user!['ID']);
-    }
+    if (generation != _sessionGeneration) return;
+    await _loadAddresses(addressController);
 
+    if (generation != _sessionGeneration) return;
     notifyListeners();
   }
 
@@ -104,16 +188,72 @@ class AuthController extends ChangeNotifier {
   }
 
   Future<void> logout() async {
+    _sessionGeneration++;
+    final tokenClear = TokenStorage.clear();
+    _cards?.clear();
+    _addresses?.clear();
+    _cart?.clear();
+    _orders?.clear();
+    _payments?.clear();
     token = null;
     user = null;
-    await TokenStorage.clear();
+    sessionRestoreError = null;
+    sessionExpired = false;
+    loading = false;
     notifyListeners();
+    await Future.wait([CardStorage.clear(), tokenClear]);
   }
 
-  Future<void> _expireSession() async {
+  Future<bool> updateProfile({
+    required String name,
+    required String phone,
+  }) async {
+    final generation = _sessionGeneration;
+    final userId = user?.id;
+    if (!isLogged || userId == null) return false;
+
+    final updatedUser = await _service.updateProfile(name: name, phone: phone);
+    if (generation != _sessionGeneration || user?.id != userId || !isLogged) {
+      return false;
+    }
+    user = updatedUser;
+    notifyListeners();
+    return true;
+  }
+
+  Future<void> expireSession() async {
+    _sessionGeneration++;
+    final tokenClear = TokenStorage.clear();
+    _cards?.clear();
+    _addresses?.clear();
+    _cart?.clear();
+    _orders?.clear();
+    _payments?.clear();
     token = null;
     user = null;
-    await TokenStorage.clear();
+    sessionRestoreError = null;
+    sessionExpired = true;
+    loading = false;
     notifyListeners();
+    await Future.wait([CardStorage.clear(), tokenClear]);
   }
+
+  Future<void> _loadAddresses(AddressController addressController) async {
+    if (isAdmin) {
+      addressController.clear();
+      return;
+    }
+
+    final userId = user?.id;
+    if (userId == null) return;
+
+    try {
+      await addressController.load(userId);
+    } catch (_) {
+      AppLogger.event(AppLogEvent.sessionAddressLoadFailed);
+    }
+  }
+
+  static const _sessionRestoreFailureMessage =
+      'Não foi possível validar sua sessão. Verifique sua conexão e tente novamente.';
 }

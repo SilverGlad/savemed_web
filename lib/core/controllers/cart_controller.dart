@@ -3,12 +3,34 @@ import 'package:flutter/material.dart';
 
 import '../../models/cart_item.dart';
 import '../../models/inventory_item.dart';
+import '../../models/postal_address.dart';
 
 class CartController extends ChangeNotifier {
   final List<CartItem> _items = [];
-  final ShippingService _shippingService = ShippingService();
+  final ShippingService _shippingService;
+  int _shippingGeneration = 0;
+  int _shippingInputRevision = 0;
+  int get shippingInputRevision => _shippingInputRevision;
 
-  Map<String, dynamic>? _selectedAddress;
+  CartController({ShippingService? shippingService})
+    : _shippingService = shippingService ?? ShippingService();
+
+  @override
+  void dispose() {
+    _shippingGeneration++;
+    super.dispose();
+  }
+
+  void _invalidateShipping({bool preservePickup = false}) {
+    _shippingGeneration++;
+    _shippingInputRevision++;
+    _loadingShipping = false;
+    _shippingOptions = [];
+    if (!preservePickup || !isPickupSelected) _selectedShipping = null;
+    _shippingError = null;
+  }
+
+  PostalAddress? _selectedAddress;
   int? _pharmacyId;
   String? _pharmacyName;
   bool _acceptsOwnDelivery = false;
@@ -42,11 +64,11 @@ class CartController extends ChangeNotifier {
       options.add({
         'id': 'pickup',
         'method': 'pickup',
-        'company': {'name': _pharmacyName ?? 'Farmacia'},
+        'company': {'name': _pharmacyName ?? 'Farmácia'},
         'name': 'Retirar no local',
         'delivery_time': null,
         'price': 0.0,
-        'description': 'Retirada diretamente na farmacia.',
+        'description': 'Retirada diretamente na farmácia.',
       });
     }
 
@@ -66,9 +88,10 @@ class CartController extends ChangeNotifier {
       return;
     }
 
+    final generation = ++_shippingGeneration;
     _loadingShipping = true;
     _shippingOptions = [];
-    _selectedShipping = null;
+    if (!isPickupSelected) _selectedShipping = null;
     _shippingError = null;
     notifyListeners();
 
@@ -97,18 +120,22 @@ class CartController extends ChangeNotifier {
         },
       ];
 
-      _shippingOptions = await _shippingService.quote(
+      final options = await _shippingService.quote(
         pharmacyId: _pharmacyId!,
         fromCep: fromCep,
-        toCep: _selectedAddress!['CEP'],
-        destinationAddress: _selectedAddress!,
+        toCep: _selectedAddress!.cep,
+        destinationAddress: _selectedAddress!.toShippingJson(),
         products: products,
       );
+      if (generation != _shippingGeneration) return;
+      _shippingOptions = options;
     } on ShippingQuoteException catch (error) {
+      if (generation != _shippingGeneration) return;
       _shippingError = error.message;
       _shippingOptions = [];
     } catch (_) {
-      _shippingError = 'Nao foi possivel calcular o frete agora.';
+      if (generation != _shippingGeneration) return;
+      _shippingError = 'Não foi possível calcular o frete agora.';
       _shippingOptions = [];
     }
 
@@ -117,7 +144,7 @@ class CartController extends ChangeNotifier {
   }
 
   List<CartItem> get items => _items;
-  Map<String, dynamic>? get selectedAddress => _selectedAddress;
+  PostalAddress? get selectedAddress => _selectedAddress;
   int? get pharmacyId => _pharmacyId;
   String? get pharmacyName => _pharmacyName;
   bool get hasPharmacy => _pharmacyId != null;
@@ -130,17 +157,15 @@ class CartController extends ChangeNotifier {
   double get total =>
       _items.fold(0, (sum, e) => sum + (e.item.price * e.quantity));
 
-  void selectAddress(Map<String, dynamic> address) {
+  void selectAddress(PostalAddress address) {
+    _invalidateShipping();
     _selectedAddress = address;
-    _selectedShipping = null;
-    _shippingOptions = [];
-    _shippingError = null;
     notifyListeners();
   }
 
   void clearAddress() {
+    _invalidateShipping();
     _selectedAddress = null;
-    _shippingError = null;
     notifyListeners();
   }
 
@@ -149,7 +174,10 @@ class CartController extends ChangeNotifier {
     return item.pharmacy.id == _pharmacyId;
   }
 
-  void addItem(InventoryItem item) {
+  bool addItem(InventoryItem item) {
+    if (!item.available || !canAddItem(item)) return false;
+    final index = _items.indexWhere((e) => e.item.id == item.id);
+    if (index >= 0 && _items[index].quantity >= item.stock) return false;
     if (_pharmacyId == null) {
       _pharmacyId = item.pharmacy.id;
       _pharmacyName = item.pharmacy.name;
@@ -161,23 +189,31 @@ class CartController extends ChangeNotifier {
       _ownDeliveryNote = item.pharmacy.ownDeliveryNote;
     }
 
-    final index = _items.indexWhere((e) => e.item.id == item.id);
-
     if (index >= 0) {
       _items[index].quantity++;
     } else {
       _items.add(CartItem(item: item));
     }
 
+    _invalidateShipping(preservePickup: true);
     notifyListeners();
+    return true;
   }
 
+  bool canIncrease(CartItem cartItem) =>
+      _items.contains(cartItem) &&
+      cartItem.item.available &&
+      cartItem.quantity < cartItem.item.stock;
+
   void increase(CartItem cartItem) {
+    if (!canIncrease(cartItem)) return;
     cartItem.quantity++;
+    _invalidateShipping(preservePickup: true);
     notifyListeners();
   }
 
   void decrease(CartItem cartItem) {
+    _invalidateShipping(preservePickup: true);
     if (cartItem.quantity > 1) {
       cartItem.quantity--;
     } else {
@@ -192,6 +228,7 @@ class CartController extends ChangeNotifier {
   }
 
   void remove(CartItem cartItem) {
+    _invalidateShipping(preservePickup: true);
     _items.remove(cartItem);
 
     if (_items.isEmpty) {
@@ -208,6 +245,7 @@ class CartController extends ChangeNotifier {
   }
 
   void _resetOperationalState() {
+    _invalidateShipping();
     _selectedAddress = null;
     _pharmacyId = null;
     _pharmacyName = null;
@@ -217,8 +255,5 @@ class CartController extends ChangeNotifier {
     _ownDeliveryPricePerKm = null;
     _ownDeliveryMaxDistanceKm = null;
     _ownDeliveryNote = null;
-    _shippingOptions = [];
-    _selectedShipping = null;
-    _shippingError = null;
   }
 }

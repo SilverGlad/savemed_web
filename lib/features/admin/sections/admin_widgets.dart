@@ -1,13 +1,22 @@
 part of '../admin_page.dart';
 
 class _PharmacyUserTile extends StatelessWidget {
-  final Map<String, dynamic> user;
+  final AppUser user;
   final VoidCallback onReset;
+  final VoidCallback onResendInvitation;
+  final VoidCallback onToggleStatus;
 
-  const _PharmacyUserTile({required this.user, required this.onReset});
+  const _PharmacyUserTile({
+    required this.user,
+    required this.onReset,
+    required this.onResendInvitation,
+    required this.onToggleStatus,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final isActive = user.isActive;
+    final invitationPending = user.mustChangePassword;
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
@@ -25,14 +34,14 @@ class _PharmacyUserTile extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  _str(user['NAME'], fallback: 'Usuario'),
+                  user.name,
                   style: const TextStyle(
                     color: _AdminColors.text,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
                 Text(
-                  '${_str(user['EMAIL'], fallback: '-')} - ${_str(user['USER_ROLE'], fallback: '-')}',
+                  '${user.email} - ${user.role.apiValue}',
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     color: _AdminColors.muted,
@@ -42,10 +51,38 @@ class _PharmacyUserTile extends StatelessWidget {
               ],
             ),
           ),
-          TextButton.icon(
-            onPressed: onReset,
-            icon: const Icon(Icons.lock_reset, size: 18),
-            label: const Text('Resetar senha'),
+          _SmallChip(
+            invitationPending
+                ? 'Convite pendente'
+                : isActive
+                ? 'Ativo'
+                : 'Inativo',
+            color: invitationPending
+                ? const Color(0xFFB45309)
+                : isActive
+                ? AppColors.success
+                : _AdminColors.muted,
+          ),
+          if (invitationPending)
+            IconButton(
+              tooltip: 'Reenviar convite',
+              onPressed: onResendInvitation,
+              icon: const Icon(Icons.forward_to_inbox_outlined),
+            )
+          else
+            IconButton(
+              tooltip: 'Redefinir senha',
+              onPressed: onReset,
+              icon: const Icon(Icons.lock_reset),
+            ),
+          IconButton(
+            tooltip: isActive ? 'Inativar usuário' : 'Ativar usuário',
+            onPressed: onToggleStatus,
+            icon: Icon(
+              isActive
+                  ? Icons.person_off_outlined
+                  : Icons.person_add_alt_outlined,
+            ),
           ),
         ],
       ),
@@ -93,49 +130,54 @@ class _CompactTile extends StatelessWidget {
   final String subtitle;
   final List<Widget> chips;
   final VoidCallback? onEdit;
+  final String editLabel;
+  final IconData editIcon;
   final VoidCallback? onDelete;
+  final String deleteLabel;
+  final IconData deleteIcon;
   final Widget? extra;
+  final Widget? leading;
 
   const _CompactTile({
     required this.title,
     required this.subtitle,
     this.chips = const [],
     this.onEdit,
+    this.editLabel = 'Editar',
+    this.editIcon = Icons.edit_outlined,
     this.onDelete,
+    this.deleteLabel = 'Excluir',
+    this.deleteIcon = Icons.delete_outline,
     this.extra,
+    this.leading,
   });
 
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
-      decoration: _panelDecoration(),
-      child: IntrinsicHeight(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(14),
+    decoration: _panelDecoration(),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              width: 3,
-              decoration: BoxDecoration(
-                color: AppColors.primary,
-                borderRadius: BorderRadius.circular(999),
-              ),
-            ),
-            const SizedBox(width: 12),
+            if (leading != null) ...[leading!, const SizedBox(width: 12)],
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     title,
-                    maxLines: 1,
+                    maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       color: _AdminColors.text,
-                      fontWeight: FontWeight.w900,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
-                  const SizedBox(height: 5),
+                  const SizedBox(height: 6),
                   Text(
                     subtitle,
                     maxLines: 2,
@@ -143,75 +185,123 @@ class _CompactTile extends StatelessWidget {
                     style: const TextStyle(
                       color: _AdminColors.muted,
                       fontSize: 12,
-                      height: 1.25,
                     ),
                   ),
-                  if (chips.isNotEmpty) ...[
-                    const SizedBox(height: 10),
-                    Wrap(spacing: 6, runSpacing: 6, children: chips),
-                  ],
                 ],
               ),
             ),
-            const SizedBox(width: 8),
-            _RowActions(onEdit: onEdit, onDelete: onDelete, extra: extra),
           ],
         ),
-      ),
-    );
-  }
+        if (chips.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          Wrap(spacing: 8, runSpacing: 8, children: chips),
+        ],
+        const SizedBox(height: 12),
+        const Divider(height: 1),
+        const SizedBox(height: 8),
+        Align(
+          alignment: Alignment.centerRight,
+          child: _RowActions(
+            onEdit: onEdit,
+            editLabel: editLabel,
+            editIcon: editIcon,
+            onDelete: onDelete,
+            deleteLabel: deleteLabel,
+            deleteIcon: deleteIcon,
+            extra: extra,
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 class _RowActions extends StatelessWidget {
   final VoidCallback? onEdit;
+  final String editLabel;
+  final IconData editIcon;
   final VoidCallback? onDelete;
+  final String deleteLabel;
+  final IconData deleteIcon;
   final Widget? extra;
 
-  const _RowActions({this.onEdit, this.onDelete, this.extra});
+  const _RowActions({
+    this.onEdit,
+    this.editLabel = 'Editar',
+    this.editIcon = Icons.edit_outlined,
+    this.onDelete,
+    this.deleteLabel = 'Excluir',
+    this.deleteIcon = Icons.delete_outline,
+    this.extra,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Wrap(
-      spacing: 4,
+      spacing: 8,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
         if (onEdit != null)
-          IconButton(
-            onPressed: onEdit,
-            tooltip: 'Editar',
-            visualDensity: VisualDensity.compact,
-            style: IconButton.styleFrom(
-              backgroundColor: const Color(0xFFF3F6F7),
-              foregroundColor: _AdminColors.text,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-            icon: const Icon(Icons.edit_outlined, size: 18),
+          _AdminIconButton(
+            icon: editIcon,
+            tooltip: editLabel,
+            onPressed: onEdit!,
           ),
-        if (onDelete != null)
+        if (onDelete != null && deleteLabel == 'Inativar')
           OutlinedButton.icon(
-            onPressed: onDelete,
-            icon: const Icon(Icons.delete_outline, size: 16),
-            label: const Text('Excluir'),
+            onPressed: onDelete!,
+            icon: Icon(deleteIcon, size: 16),
+            label: Text(deleteLabel),
             style: OutlinedButton.styleFrom(
               foregroundColor: AppColors.danger,
               side: BorderSide(color: AppColors.danger.withValues(alpha: 0.35)),
-              backgroundColor: AppColors.danger.withValues(alpha: 0.08),
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
-              textStyle: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
-              ),
+              backgroundColor: const Color(0xFFFBECEE),
+              minimumSize: const Size(48, 48),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
               ),
             ),
+          ),
+        if (onDelete != null && deleteLabel != 'Inativar')
+          _AdminIconButton(
+            icon: deleteIcon,
+            tooltip: deleteLabel,
+            onPressed: onDelete!,
+            danger: true,
           ),
         if (extra != null) extra!,
       ],
     );
   }
+}
+
+class _AdminIconButton extends StatelessWidget {
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onPressed;
+  final bool danger;
+
+  const _AdminIconButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onPressed,
+    this.danger = false,
+  });
+
+  @override
+  Widget build(BuildContext context) => IconButton.filledTonal(
+    onPressed: onPressed,
+    tooltip: tooltip,
+    style: IconButton.styleFrom(
+      fixedSize: const Size(48, 48),
+      foregroundColor: danger ? AppColors.danger : _AdminColors.text,
+      backgroundColor: danger
+          ? const Color(0xFFFBECEE)
+          : const Color(0xFFEAF1F0),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+    ),
+    icon: Icon(icon, size: 18),
+  );
 }
 
 class _BoolChip extends StatelessWidget {
@@ -224,8 +314,8 @@ class _BoolChip extends StatelessWidget {
   Widget build(BuildContext context) {
     return _SmallChip(
       label == null
-          ? (value ? 'Sim' : 'Nao')
-          : '$label: ${value ? 'Sim' : 'Nao'}',
+          ? (value ? 'Sim' : 'Não')
+          : '$label: ${value ? 'Sim' : 'Não'}',
       color: value ? AppColors.success : _AdminColors.muted,
     );
   }
@@ -247,8 +337,9 @@ class _StockChip extends StatelessWidget {
 
 class _StatusChip extends StatelessWidget {
   final String label;
+  final String? prefix;
 
-  const _StatusChip({required this.label});
+  const _StatusChip({required this.label, this.prefix});
 
   @override
   Widget build(BuildContext context) {
@@ -263,7 +354,11 @@ class _StatusChip extends StatelessWidget {
               lower.contains('refund')
         ? AppColors.danger
         : AppColors.primary;
-    return _SmallChip(label.isEmpty ? '-' : _statusLabel(label), color: color);
+    final status = label.isEmpty ? '-' : _statusLabel(label);
+    return _SmallChip(
+      prefix == null ? status : '$prefix: $status',
+      color: color,
+    );
   }
 }
 
@@ -310,12 +405,325 @@ class _FormGrid extends StatelessWidget {
           spacing: 10,
           runSpacing: 10,
           children: children
-              .map((child) => SizedBox(width: itemWidth, child: child))
+              .map(
+                (child) => SizedBox(
+                  width: child is _FullWidthFormField
+                      ? constraints.maxWidth
+                      : itemWidth,
+                  child: child is _FullWidthFormField ? child.child : child,
+                ),
+              )
               .toList(),
         );
       },
     );
   }
+}
+
+class _FullWidthFormField extends StatelessWidget {
+  final Widget child;
+
+  const _FullWidthFormField({required this.child});
+
+  @override
+  Widget build(BuildContext context) => child;
+}
+
+class _FormSectionHeading extends StatelessWidget {
+  final String title;
+  final String description;
+  final IconData icon;
+
+  const _FormSectionHeading({
+    required this.title,
+    required this.description,
+    required this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 8, bottom: 14),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 20, color: Theme.of(context).colorScheme.primary),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  description,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: _AdminColors.muted),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AdminImagePicker extends StatelessWidget {
+  final String label;
+  final String? selectedFilename;
+  final bool hasExistingImage;
+  final String? existingImageUrl;
+  final Uint8List? selectedBytes;
+  final ValueChanged<_SelectedAdminImage> onSelected;
+
+  const _AdminImagePicker({
+    required this.label,
+    required this.selectedFilename,
+    required this.hasExistingImage,
+    this.existingImageUrl,
+    this.selectedBytes,
+    required this.onSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final status =
+        selectedFilename ??
+        (hasExistingImage
+            ? 'Imagem atual cadastrada'
+            : 'Nenhuma imagem selecionada');
+    return InputDecorator(
+      decoration: InputDecoration(labelText: label),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (selectedBytes != null || existingImageUrl != null)
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: SizedBox(
+                height: 180,
+                width: double.infinity,
+                child: selectedBytes != null
+                    ? Image.memory(
+                        selectedBytes!,
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, __, ___) => const Center(
+                          child: Icon(Icons.broken_image_outlined, size: 32),
+                        ),
+                      )
+                    : Image.network(
+                        existingImageUrl!,
+                        fit: BoxFit.contain,
+                        loadingBuilder: (_, child, progress) => progress == null
+                            ? child
+                            : const Center(
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              ),
+                        errorBuilder: (_, __, ___) => const Center(
+                          child: Icon(Icons.broken_image_outlined, size: 32),
+                        ),
+                      ),
+              ),
+            ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              const Icon(Icons.image_outlined),
+              const SizedBox(width: 10),
+              Expanded(child: Text(status)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: FilledButton.tonalIcon(
+              onPressed: () => _pick(context),
+              icon: const Icon(Icons.upload_file_outlined),
+              label: Text(
+                hasExistingImage || selectedFilename != null
+                    ? 'Trocar'
+                    : 'Selecionar',
+              ),
+            ),
+          ),
+          if (selectedBytes != null || existingImageUrl != null)
+            TextButton.icon(
+              onPressed: () => _showImagePreview(
+                context,
+                url: existingImageUrl,
+                bytes: selectedBytes,
+              ),
+              icon: const Icon(Icons.zoom_in),
+              label: const Text('Ampliar imagem'),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _pick(BuildContext context) async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: const ['png', 'jpg', 'jpeg', 'webp'],
+        allowMultiple: false,
+        withData: false,
+        withReadStream: true,
+      );
+      if (result == null || result.files.isEmpty || !context.mounted) return;
+      final file = result.files.single;
+      const maxImageBytes = 5 * 1024 * 1024;
+      void showSizeLimitError() {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('A imagem deve ter no máximo 5 MB.')),
+        );
+      }
+
+      if (file.size > maxImageBytes) {
+        showSizeLimitError();
+        return;
+      }
+      final stream = file.readStream;
+      if (stream == null) {
+        throw Exception('Conteúdo da imagem indisponível.');
+      }
+
+      final buffer = BytesBuilder(copy: false);
+      var bytesRead = 0;
+      await for (final chunk in stream) {
+        if (!context.mounted) return;
+        bytesRead += chunk.length;
+        if (bytesRead > maxImageBytes) {
+          if (context.mounted) showSizeLimitError();
+          return;
+        }
+        buffer.add(chunk);
+      }
+
+      if (!context.mounted) return;
+      final bytes = buffer.takeBytes();
+      if (bytes.isEmpty) {
+        throw Exception('Conteúdo da imagem indisponível.');
+      }
+      onSelected(_SelectedAdminImage(name: file.name, bytes: bytes));
+    } catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(_cleanError(error))));
+    }
+  }
+}
+
+class _AdminThumbnail extends StatelessWidget {
+  final String? imageUrl;
+  final double size;
+
+  const _AdminThumbnail({required this.imageUrl, this.size = 80});
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: 'Ampliar imagem',
+      child: InkWell(
+        onTap: imageUrl == null
+            ? null
+            : () => _showImagePreview(context, url: imageUrl),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: Container(
+            width: size,
+            height: size,
+            color: const Color(0xFFF1F5F5),
+            child: imageUrl == null
+                ? const Icon(Icons.image_not_supported_outlined, size: 20)
+                : Image.network(
+                    imageUrl!,
+                    fit: BoxFit.contain,
+                    loadingBuilder: (_, child, progress) => progress == null
+                        ? child
+                        : const Center(
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                    errorBuilder: (_, __, ___) =>
+                        const Icon(Icons.broken_image_outlined, size: 20),
+                  ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+Future<void> _showImagePreview(
+  BuildContext context, {
+  String? url,
+  Uint8List? bytes,
+}) => showDialog<void>(
+  context: context,
+  builder: (context) => Dialog(
+    child: ConstrainedBox(
+      constraints: BoxConstraints(
+        maxWidth: 800,
+        maxHeight: MediaQuery.sizeOf(context).height * 0.8,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Align(
+            alignment: Alignment.centerRight,
+            child: IconButton(
+              tooltip: 'Fechar imagem',
+              onPressed: () => Navigator.pop(context),
+              icon: const Icon(Icons.close),
+            ),
+          ),
+          Flexible(
+            child: InteractiveViewer(
+              child: bytes != null
+                  ? Image.memory(
+                      bytes,
+                      fit: BoxFit.contain,
+                      errorBuilder: (_, __, ___) => const Padding(
+                        padding: EdgeInsets.all(24),
+                        child: Text('Não foi possível carregar a imagem.'),
+                      ),
+                    )
+                  : Image.network(
+                      url!,
+                      fit: BoxFit.contain,
+                      loadingBuilder: (_, child, progress) => progress == null
+                          ? child
+                          : const Center(
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                      errorBuilder: (_, __, ___) => const Padding(
+                        padding: EdgeInsets.all(24),
+                        child: Text('Não foi possível carregar a imagem.'),
+                      ),
+                    ),
+            ),
+          ),
+        ],
+      ),
+    ),
+  ),
+);
+
+class _SelectedAdminImage {
+  final String name;
+  final Uint8List bytes;
+
+  const _SelectedAdminImage({required this.name, required this.bytes});
 }
 
 class _SwitchRow extends StatelessWidget {
@@ -428,17 +836,85 @@ class _LoadingPanel extends StatelessWidget {
   }
 }
 
-class _EmptyPanel extends StatelessWidget {
-  const _EmptyPanel();
+class _LoadErrorPanel extends StatelessWidget {
+  final String message;
+  final VoidCallback onRetry;
+
+  const _LoadErrorPanel({required this.message, required this.onRetry});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       decoration: _panelDecoration(),
-      child: const Center(
-        child: Text(
-          'Nenhum registro encontrado.',
-          style: TextStyle(color: _AdminColors.muted),
+      padding: const EdgeInsets.all(24),
+      child: Center(
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.cloud_off_outlined,
+                color: AppColors.danger,
+                size: 32,
+              ),
+              const SizedBox(height: 12),
+              Text(
+                message,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: _AdminColors.text),
+              ),
+              const SizedBox(height: 16),
+              OutlinedButton.icon(
+                onPressed: onRetry,
+                icon: const Icon(Icons.refresh),
+                label: const Text('Tentar novamente'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _EmptyPanel extends StatelessWidget {
+  final String title;
+  final String? actionLabel;
+  final VoidCallback? onAction;
+
+  const _EmptyPanel({required this.title, this.actionLabel, this.onAction});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: _panelDecoration(),
+      padding: const EdgeInsets.all(24),
+      child: Center(
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.inbox_outlined,
+                color: _AdminColors.muted,
+                size: 32,
+              ),
+              const SizedBox(height: 12),
+              Text(
+                title,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: _AdminColors.muted),
+              ),
+              if (actionLabel != null && onAction != null) ...[
+                const SizedBox(height: 16),
+                FilledButton.icon(
+                  onPressed: onAction,
+                  icon: const Icon(Icons.add),
+                  label: Text(actionLabel!),
+                ),
+              ],
+            ],
+          ),
         ),
       ),
     );
@@ -460,25 +936,82 @@ BoxDecoration _panelDecoration() {
   );
 }
 
+String? _requiredTextValidator(String? value, String label) {
+  if (!isValidRequiredText(value ?? '')) return 'Informe $label.';
+  return null;
+}
+
+String? _emailValidator(String? value) {
+  if (!isValidEmail(value ?? '')) return 'Informe um e-mail válido.';
+  return null;
+}
+
+String? _phoneValidator(String? value, {bool optional = false}) {
+  final text = value ?? '';
+  if (optional && text.trim().isEmpty) return null;
+  if (!isValidPhone(text)) return 'Informe um telefone válido com DDD.';
+  return null;
+}
+
+String? _cnpjValidator(String? value) {
+  if (!isValidCNPJ(value ?? '')) return 'Informe um CNPJ válido.';
+  return null;
+}
+
+String? _cepValidator(String? value) {
+  if (digitsOnly(value ?? '').length != 8) return 'Informe um CEP válido.';
+  return null;
+}
+
+String? _ufValidator(String? value) {
+  if ((value ?? '').trim().length != 2) return 'Informe uma UF válida.';
+  return null;
+}
+
+String? _requiredEntityValidator(int? value, String label) {
+  if (value == null) return 'Selecione $label.';
+  return null;
+}
+
+String? _nonNegativeNumberValidator(String? value, String label) {
+  final number = _toDouble(value ?? '');
+  if (number == null || number < 0) return 'Informe $label válido.';
+  return null;
+}
+
+String? _positiveNumberValidator(String? value, String label) {
+  final number = _toDouble(value ?? '');
+  if (number == null || number <= 0) return 'Informe $label maior que zero.';
+  return null;
+}
+
 Widget _input(
   TextEditingController controller,
   String label, {
   bool obscureText = false,
   TextInputType? keyboardType,
   List<TextInputFormatter>? inputFormatters,
+  String? Function(String?)? validator,
+  Widget? suffixIcon,
+  bool enabled = true,
+  String? helperText,
+  int? maxLines,
 }) {
-  return SizedBox(
-    height: 48,
-    child: TextField(
-      controller: controller,
-      obscureText: obscureText,
-      keyboardType: keyboardType,
-      inputFormatters: inputFormatters,
-      decoration: InputDecoration(
-        labelText: label,
-        isDense: true,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-      ),
+  return TextFormField(
+    controller: controller,
+    obscureText: obscureText,
+    keyboardType: keyboardType,
+    inputFormatters: inputFormatters,
+    validator: validator,
+    enabled: enabled,
+    maxLines: maxLines ?? 1,
+    autovalidateMode: AutovalidateMode.onUserInteraction,
+    decoration: InputDecoration(
+      labelText: label,
+      suffixIcon: suffixIcon,
+      helperText: helperText,
+      isDense: true,
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
     ),
   );
 }
@@ -491,65 +1024,63 @@ Widget _entityDropdown({
   String nameKey = 'NAME',
   bool enabled = true,
   bool optional = false,
+  String? Function(int?)? validator,
 }) {
   final options = items
-      .whereType<Map<String, dynamic>>()
-      .where((item) => _asInt(item['ID']) != null)
+      .map((item) {
+        if (item is Pharmacy) return (id: item.id, label: item.name);
+        if (item is Category) return (id: item.id, label: item.name);
+        if (item is Subcategory) return (id: item.id, label: item.name);
+        if (item is Medication) return (id: item.id, label: item.name);
+        if (item is Map<String, dynamic>) {
+          final id = _asInt(item['ID']);
+          if (id != null) {
+            return (
+              id: id,
+              label: _str(item[nameKey], fallback: 'Registro #$id'),
+            );
+          }
+        }
+        return null;
+      })
+      .whereType<({int id, String label})>()
       .toList();
-  final ids = options
-      .map((item) => _asInt(item['ID']))
-      .whereType<int>()
-      .toSet();
+  final ids = options.map((item) => item.id).toSet();
   final initialValue = ids.contains(value) ? value : null;
 
-  return DropdownMenu<int>(
-    initialSelection: initialValue,
-    enabled: enabled,
-    enableFilter: true,
-    enableSearch: true,
-    expandedInsets: EdgeInsets.zero,
-    label: Text(label),
-    dropdownMenuEntries: [
-      if (optional) const DropdownMenuEntry<int>(value: -1, label: 'Nenhuma'),
-      ...options.map((item) {
-        final id = _asInt(item['ID'])!;
-        return DropdownMenuEntry<int>(
-          value: id,
-          label: _str(item[nameKey], fallback: 'Registro #$id'),
-        );
-      }),
-    ],
-    onSelected: enabled
-        ? (selected) => onChanged(selected == -1 ? null : selected)
-        : null,
-  );
-}
-
-Widget _stringDropdown({
-  required String label,
-  required String value,
-  required List<String> values,
-  required ValueChanged<String> onChanged,
-}) {
-  return DropdownButtonFormField<String>(
-    initialValue: values.contains(value) ? value : null,
-    isExpanded: true,
-    decoration: InputDecoration(
-      labelText: label,
-      isDense: true,
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+  return FormField<int>(
+    key: ValueKey((label, initialValue, Object.hashAll(ids))),
+    initialValue: initialValue,
+    validator: validator,
+    autovalidateMode: AutovalidateMode.onUserInteraction,
+    builder: (field) => Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        DropdownMenu<int>(
+          initialSelection: initialValue,
+          enabled: enabled,
+          enableFilter: true,
+          enableSearch: true,
+          expandedInsets: EdgeInsets.zero,
+          label: Text(label),
+          errorText: field.errorText,
+          dropdownMenuEntries: [
+            if (optional)
+              const DropdownMenuEntry<int>(value: -1, label: 'Nenhuma'),
+            ...options.map((item) {
+              return DropdownMenuEntry<int>(value: item.id, label: item.label);
+            }),
+          ],
+          onSelected: enabled
+              ? (selected) {
+                  final value = selected == -1 ? null : selected;
+                  field.didChange(value);
+                  onChanged(value);
+                }
+              : null,
+        ),
+      ],
     ),
-    items: values
-        .map(
-          (item) => DropdownMenuItem<String>(
-            value: item,
-            child: Text(_statusLabel(item)),
-          ),
-        )
-        .toList(),
-    onChanged: (selected) {
-      if (selected != null) onChanged(selected);
-    },
   );
 }
 
@@ -558,51 +1089,178 @@ Future<void> _showAdminDialog({
   required String title,
   required Widget child,
   required Future<bool> Function() onSave,
+  List<TextEditingController> controllers = const [],
 }) async {
+  final sessionScope = _adminScope(context.read<AuthController>().user);
   await showDialog<void>(
     context: context,
     barrierDismissible: false,
-    builder: (dialogContext) {
-      var saving = false;
-      return StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-          title: Text(title),
-          content: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 720),
-            child: SingleChildScrollView(child: child),
+    builder: (_) => _AdminFormDialog(
+      sessionScope: sessionScope,
+      title: title,
+      onSave: onSave,
+      controllers: controllers,
+      child: child,
+    ),
+  );
+}
+
+class _AdminFormDialog extends StatefulWidget {
+  final Object sessionScope;
+  final String title;
+  final Widget child;
+  final Future<bool> Function() onSave;
+  final List<TextEditingController> controllers;
+
+  const _AdminFormDialog({
+    required this.sessionScope,
+    required this.title,
+    required this.child,
+    required this.onSave,
+    required this.controllers,
+  });
+
+  @override
+  State<_AdminFormDialog> createState() => _AdminFormDialogState();
+}
+
+class _AdminFormDialogState extends State<_AdminFormDialog> {
+  final formKey = GlobalKey<FormState>();
+  bool saving = false;
+  String? saveError;
+
+  @override
+  void dispose() {
+    for (final controller in widget.controllers) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
+  Future<void> save() async {
+    if (saving) return;
+    if (_adminScope(context.read<AuthController>().user) !=
+        widget.sessionScope) {
+      return;
+    }
+    if (!(formKey.currentState?.validate() ?? true)) return;
+    setState(() {
+      saving = true;
+      saveError = null;
+    });
+    bool saved;
+    try {
+      saved = await widget.onSave();
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        saving = false;
+        saveError = _cleanError(error);
+      });
+      return;
+    }
+    if (!mounted) return;
+    if (_adminScope(context.read<AuthController>().user) !=
+        widget.sessionScope) {
+      setState(() => saving = false);
+      return;
+    }
+    if (saved) {
+      Navigator.pop(context);
+    } else {
+      setState(() {
+        saving = false;
+        saveError =
+            'Não foi possível concluir o salvamento. Seus dados foram mantidos. Confira os dados e tente novamente.';
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final currentScope = _adminScope(context.watch<AuthController>().user);
+    if (currentScope != widget.sessionScope) {
+      return PopScope(
+        canPop: !saving,
+        child: AlertDialog(
+          title: const Text('Sessão alterada'),
+          content: Text(
+            saving
+                ? 'A sessão mudou durante o salvamento. Aguarde a conclusão e consulte o registro na conta original.'
+                : 'Este formulário pertence à sessão anterior. Feche e abra o cadastro novamente na conta atual.',
           ),
           actions: [
             TextButton(
-              onPressed: saving ? null : () => Navigator.pop(dialogContext),
-              child: const Text('Cancelar'),
-            ),
-            FilledButton(
-              onPressed: saving
-                  ? null
-                  : () async {
-                      setDialogState(() => saving = true);
-                      final saved = await onSave();
-                      if (!dialogContext.mounted) return;
-                      if (saved) {
-                        Navigator.pop(dialogContext);
-                      } else {
-                        setDialogState(() => saving = false);
-                      }
-                    },
-              child: saving
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Text('Salvar'),
+              onPressed: saving ? null : () => Navigator.pop(context),
+              child: const Text('Fechar'),
             ),
           ],
         ),
       );
-    },
-  );
+    }
+    final dialogWidth = (MediaQuery.sizeOf(context).width - 64)
+        .clamp(0.0, 640.0)
+        .toDouble();
+    return PopScope(
+      canPop: !saving,
+      child: AlertDialog(
+        insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+        backgroundColor: const Color(0xFFFDFEFE),
+        surfaceTintColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        titlePadding: const EdgeInsets.fromLTRB(24, 22, 24, 8),
+        contentPadding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+        title: Text(
+          widget.title,
+          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
+        ),
+        content: SizedBox(
+          width: dialogWidth,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight:
+                  (MediaQuery.sizeOf(context).height -
+                          MediaQuery.viewInsetsOf(context).bottom -
+                          200)
+                      .clamp(100, 700),
+            ),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Form(key: formKey, child: widget.child),
+            ),
+          ),
+        ),
+        actionsPadding: const EdgeInsets.fromLTRB(24, 12, 24, 18),
+        actions: [
+          if (saveError != null)
+            SizedBox(
+              width: double.infinity,
+              child: Semantics(
+                liveRegion: true,
+                child: Text(
+                  saveError!,
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
+              ),
+            ),
+          TextButton(
+            onPressed: saving ? null : () => Navigator.pop(context),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: saving ? null : save,
+            child: saving
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Text('Salvar'),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 String _str(Object? value, {String fallback = ''}) {
@@ -610,20 +1268,8 @@ String _str(Object? value, {String fallback = ''}) {
   return text.isEmpty || text == 'null' ? fallback : text;
 }
 
-String _id(Map<String, dynamic> item) =>
-    'ID ${_str(item['ID'], fallback: '-')}';
-
-String _addressLine(Map<String, dynamic> item) {
-  final parts = [
-    _str(item['CITY']),
-    _str(item['STATE']),
-    _str(item['ZIPCODE']),
-  ].where((part) => part.isNotEmpty).toList();
-  return parts.isEmpty ? '-' : parts.join(' - ');
-}
-
 double? _toDouble(String value) {
-  return double.tryParse(value.trim().replaceAll(',', '.'));
+  return parseLocalizedNumber(value);
 }
 
 int? _asInt(Object? value) {
@@ -632,7 +1278,10 @@ int? _asInt(Object? value) {
 }
 
 String _cleanError(Object error) {
-  return error.toString().replaceFirst('Exception: ', '');
+  return ApiErrorMessage.forUser(
+    error,
+    fallback: 'Não foi possível concluir a operação. Tente novamente.',
+  );
 }
 
 String _statusLabel(String value) {

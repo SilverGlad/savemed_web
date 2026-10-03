@@ -10,13 +10,15 @@ class OrderBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final controller = context.watch<InventoryController>();
 
-    return Row(
+    return Wrap(
+      spacing: 12,
+      runSpacing: 4,
+      crossAxisAlignment: WrapCrossAlignment.center,
       children: [
         const Text(
           'Ordenar por:',
           style: TextStyle(fontWeight: FontWeight.w500),
         ),
-        const SizedBox(width: 12),
 
         DropdownButton<InventoryOrder>(
           value: controller.order,

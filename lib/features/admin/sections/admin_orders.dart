@@ -1,60 +1,81 @@
 part of '../admin_page.dart';
 
 class _OrdersPage extends _AdminListPage {
-  const _OrdersPage({required super.pharmacyId});
+  const _OrdersPage({required super.pharmacyId, required super.service});
 
   @override
   State<_OrdersPage> createState() => _OrdersPageState();
 }
 
-class _OrdersPageState extends _AdminListPageState<_OrdersPage> {
+class _OrdersPageState extends _AdminListPageState<_OrdersPage, CustomerOrder> {
   @override
   String get title => 'Pedidos';
 
   @override
-  String get subtitle => 'Acompanhamento de status, pagamento e operacao.';
+  String get subtitle => 'Acompanhamento de status, pagamento e operação.';
 
   @override
   bool get canCreate => false;
 
   @override
-  Future<List<dynamic>> fetch() =>
+  Future<List<CustomerOrder>> fetch() =>
       service.listOrders(pharmacyId: widget.pharmacyId);
 
   @override
-  bool matches(Map<String, dynamic> item, String query) =>
-      textMatch(item, query);
+  bool matches(CustomerOrder item, String query) =>
+      item.id.toString().contains(query) ||
+      (item.customerName?.toLowerCase().contains(query) ?? false) ||
+      item.pharmacyName.toLowerCase().contains(query) ||
+      item.deliveryMethod.toLowerCase().contains(query) ||
+      item.deliveryLabel.toLowerCase().contains(query) ||
+      item.status.toLowerCase().contains(query) ||
+      item.paymentStatus.toLowerCase().contains(query) ||
+      fulfillmentStageLabel(
+        item.fulfillmentStage,
+      ).toLowerCase().contains(query);
 
   @override
   List<DataColumn> get columns => const [
     DataColumn(label: Text('Pedido')),
-    DataColumn(label: Text('Farmacia')),
+    DataColumn(label: Text('Cliente')),
+    DataColumn(label: Text('Data/hora')),
+    DataColumn(label: Text('Farmácia')),
     DataColumn(label: Text('Status')),
     DataColumn(label: Text('Pagamento')),
     DataColumn(label: Text('Total')),
-    DataColumn(label: Text('Acoes')),
+    DataColumn(label: Text('Ações')),
   ];
 
   @override
-  DataRow buildRow(Map<String, dynamic> item) {
-    final pharmacy = item['pharmacy'] as Map<String, dynamic>?;
+  DataRow buildRow(CustomerOrder item) {
     final canRefund =
-        PaymentStatus.fromApi(item['PAYMENT_STATUS']) == PaymentStatus.paid;
+        !fulfillmentBlocksRefund(item.fulfillmentStage) &&
+        OrderStatusRules.canRefund(
+          orderStatus: OrderStatus.fromApi(item.status),
+          paymentStatus: PaymentStatus.fromApi(item.paymentStatus),
+        );
     return DataRow(
       cells: [
         DataCell(
-          _PrimaryCell(
-            title: '#${item['ID']}',
-            subtitle: _str(item['DELIVERY_METHOD']),
+          _PrimaryCell(title: '#${item.id}', subtitle: _deliveryMethod(item)),
+        ),
+        DataCell(Text(item.customerName ?? '—')),
+        DataCell(Text(_createdAt(item))),
+        DataCell(Text(item.pharmacyName)),
+        DataCell(
+          Text(
+            item.status == 'canceled'
+                ? 'Cancelado'
+                : fulfillmentStageLabel(item.fulfillmentStage),
           ),
         ),
-        DataCell(Text(_str(pharmacy?['NAME'], fallback: 'Farmacia'))),
-        DataCell(_StatusChip(label: _str(item['STATUS']))),
-        DataCell(_StatusChip(label: _str(item['PAYMENT_STATUS']))),
-        DataCell(Text('R\$ ${_str(item['TOTAL_AMOUNT'], fallback: '0')}')),
+        DataCell(_StatusChip(label: item.paymentStatus)),
+        DataCell(Text(formatBrl(item.totalAmount))),
         DataCell(
           _RowActions(
-            onEdit: () => _showDialog(item),
+            onEdit: () => _openDetails(item),
+            editLabel: 'Abrir pedido',
+            editIcon: Icons.receipt_long_outlined,
             extra: canRefund
                 ? TextButton(
                     onPressed: () => _confirmRefund(item),
@@ -68,19 +89,30 @@ class _OrdersPageState extends _AdminListPageState<_OrdersPage> {
   }
 
   @override
-  Widget buildMobileItem(Map<String, dynamic> item) {
-    final pharmacy = item['pharmacy'] as Map<String, dynamic>?;
+  Widget buildMobileItem(CustomerOrder item) {
     final canRefund =
-        PaymentStatus.fromApi(item['PAYMENT_STATUS']) == PaymentStatus.paid;
+        !fulfillmentBlocksRefund(item.fulfillmentStage) &&
+        OrderStatusRules.canRefund(
+          orderStatus: OrderStatus.fromApi(item.status),
+          paymentStatus: PaymentStatus.fromApi(item.paymentStatus),
+        );
     return _CompactTile(
-      title: 'Pedido #${item['ID']}',
-      subtitle:
-          '${_str(pharmacy?['NAME'], fallback: 'Farmacia')} - R\$ ${_str(item['TOTAL_AMOUNT'], fallback: '0')}',
+      title: 'Pedido #${item.id}',
+      subtitle: '${item.customerName ?? 'Cliente'} · ${item.pharmacyName}',
       chips: [
-        _StatusChip(label: _str(item['STATUS'])),
-        _StatusChip(label: _str(item['PAYMENT_STATUS'])),
+        _StatusChip(label: item.status, prefix: 'Pedido'),
+        _StatusChip(
+          label: fulfillmentStageLabel(item.fulfillmentStage),
+          prefix: 'Preparo/entrega',
+        ),
+        _StatusChip(label: item.paymentStatus, prefix: 'Pagamento'),
+        _SmallChip(_deliveryMethod(item)),
+        _SmallChip(_createdAt(item)),
+        _SmallChip(formatBrl(item.totalAmount)),
       ],
-      onEdit: () => _showDialog(item),
+      onEdit: () => _openDetails(item),
+      editLabel: 'Abrir pedido',
+      editIcon: Icons.receipt_long_outlined,
       extra: canRefund
           ? TextButton(
               onPressed: () => _confirmRefund(item),
@@ -90,73 +122,158 @@ class _OrdersPageState extends _AdminListPageState<_OrdersPage> {
     );
   }
 
+  String _createdAt(CustomerOrder item) {
+    final value = item.createdAt?.toLocal();
+    if (value == null) return 'Data não informada';
+    final day = value.day.toString().padLeft(2, '0');
+    final month = value.month.toString().padLeft(2, '0');
+    final hour = value.hour.toString().padLeft(2, '0');
+    final minute = value.minute.toString().padLeft(2, '0');
+    return '$day/$month/${value.year} às $hour:$minute';
+  }
+
+  String _deliveryMethod(CustomerOrder item) {
+    final value = item.deliveryMethod.toLowerCase();
+    if (value.contains('pickup') || value.contains('retirada')) {
+      return 'Retirada';
+    }
+    if (value.contains('delivery') || value.contains('entrega')) {
+      return 'Entrega';
+    }
+    return item.deliveryMethod.isEmpty
+        ? 'Modalidade não informada'
+        : item.deliveryMethod;
+  }
+
   @override
   Future<void> onCreate() async {}
 
-  Future<void> _showDialog(Map<String, dynamic> item) async {
-    var status = OrderStatus.fromApi(item['STATUS']);
-    var paymentStatus = PaymentStatus.fromApi(item['PAYMENT_STATUS']);
-    final allowedOrderStatuses = OrderStatusRules.allowedOrderTransitions(
-      status,
-    ).map((value) => value.apiValue).toList();
-    final allowedPaymentStatuses = OrderStatusRules.allowedPaymentTransitions(
-      paymentStatus,
-    ).map((value) => value.apiValue).toList();
-    await _showAdminDialog(
-      context: context,
-      title: 'Editar pedido #${item['ID']}',
-      child: _FormGrid(
-        children: [
-          _stringDropdown(
-            label: 'Status do pedido',
-            value: status.apiValue,
-            values: allowedOrderStatuses,
-            onChanged: (value) => status = OrderStatus.fromApi(value),
-          ),
-          _stringDropdown(
-            label: 'Status do pagamento',
-            value: paymentStatus.apiValue,
-            values: allowedPaymentStatuses,
-            onChanged: (value) => paymentStatus = PaymentStatus.fromApi(value),
-          ),
-        ],
+  Future<void> _openDetails(CustomerOrder item) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => OrderOperationsPage(orderId: item.id, service: service),
       ),
-      onSave: () => handle(() async {
-        if (!allowedOrderStatuses.contains(status.apiValue) ||
-            !allowedPaymentStatuses.contains(paymentStatus.apiValue)) {
-          throw Exception('Selecione status validos para o pedido.');
-        }
-        await service.updateOrder(item['ID'], {
-          'STATUS': status.apiValue,
-          'PAYMENT_STATUS': paymentStatus.apiValue,
-        });
-      }),
     );
+    if (mounted) await reload();
   }
 
-  Future<void> _confirmRefund(Map<String, dynamic> item) async {
-    final confirmed = await showDialog<bool>(
+  Future<void> _confirmRefund(CustomerOrder item) async {
+    final formKey = GlobalKey<FormState>();
+    var refundReason = '';
+    final reason = await showDialog<String>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: Text('Estornar pedido #${item['ID']}'),
-        content: const Text(
-          'O pagamento sera estornado e o pedido sera cancelado. Esta acao nao pode ser desfeita.',
+        title: Text('Estornar pedido #${item.id}'),
+        content: SizedBox(
+          width: 420,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _OrderDetailRow(label: 'Farmácia', value: item.pharmacyName),
+                _OrderDetailRow(
+                  label: 'Total',
+                  value: formatBrl(item.totalAmount),
+                ),
+                _OrderDetailRow(
+                  label: 'Pedido',
+                  value: _statusLabel(item.status),
+                ),
+                _OrderDetailRow(
+                  label: 'Pagamento',
+                  value: _statusLabel(item.paymentStatus),
+                ),
+                _OrderDetailRow(
+                  label: 'Entrega',
+                  value: item.deliveryLabel.isEmpty
+                      ? 'Não informada'
+                      : item.deliveryLabel,
+                ),
+                const SizedBox(height: 14),
+                const Text(
+                  'O pagamento será estornado e o pedido será cancelado. Esta ação não pode ser desfeita.',
+                  style: TextStyle(color: AppColors.danger, height: 1.4),
+                ),
+                const SizedBox(height: 16),
+                Form(
+                  key: formKey,
+                  child: TextFormField(
+                    minLines: 2,
+                    maxLines: 4,
+                    maxLength: 500,
+                    decoration: const InputDecoration(
+                      labelText: 'Justificativa do estorno',
+                      hintText: 'Informe o motivo para o histórico da operação',
+                      border: OutlineInputBorder(),
+                    ),
+                    validator: (value) {
+                      if ((value?.trim().length ?? 0) < 10) {
+                        return 'Informe pelo menos 10 caracteres.';
+                      }
+                      return null;
+                    },
+                    onChanged: (value) => refundReason = value,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text('Voltar'),
           ),
           FilledButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
+            onPressed: () {
+              if (formKey.currentState?.validate() ?? false) {
+                Navigator.pop(dialogContext, refundReason.trim());
+              }
+            },
             style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
             child: const Text('Confirmar estorno'),
           ),
         ],
       ),
     );
-    if (confirmed == true && mounted) {
-      await handle(() => service.refundOrder(item['ID']));
+    if (reason != null && mounted) {
+      await handle(() => service.refundOrder(item.id, reason: reason));
     }
+  }
+}
+
+class _OrderDetailRow extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _OrderDetailRow({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 110,
+            child: Text(
+              label,
+              style: const TextStyle(color: _AdminColors.muted),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(
+                color: _AdminColors.text,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

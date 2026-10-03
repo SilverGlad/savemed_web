@@ -1,8 +1,16 @@
+import 'package:http/http.dart' as http;
+
 import '../api/api_client.dart';
 import '../api/api_response.dart';
+import '../../models/customer_order.dart';
 
 class OrderService {
-  Future<int> createOrder({
+  final Future<http.Response> Function(String path, Map body) _post;
+
+  OrderService({Future<http.Response> Function(String path, Map body)? post})
+    : _post = post ?? ApiClient.post;
+
+  Future<int> checkout({
     required int customerId,
     required int pharmacyId,
     int? addressId,
@@ -10,70 +18,77 @@ class OrderService {
     required String deliveryMethod,
     String? deliveryLabel,
     required double subtotal,
-    required double total,
+    required List<Map<String, num>> items,
   }) async {
-    final res = await ApiClient.post('/orders', {
+    final response = await _post('/orders/checkout', {
       'CUSTOMER_ID': customerId,
       'PHARMACY_ID': pharmacyId,
       'ADDRESS_ID': addressId,
       'SHIPPING_PRICE': shippingPrice,
       'DELIVERY_METHOD': deliveryMethod,
       'DELIVERY_LABEL': deliveryLabel,
-      'SUBTOTAL': subtotal,
-      'TOTAL_AMOUNT': total,
+      'EXPECTED_SUBTOTAL': subtotal,
+      'ITEMS': items
+          .map(
+            (item) => {
+              'INVENTORY_ID': item['inventoryId'],
+              'QUANTITY': item['quantity'],
+            },
+          )
+          .toList(),
     });
 
     final data = ApiResponse.object(
-      res,
+      response,
       expectedStatusCodes: {201},
       fallback: 'Erro ao criar pedido',
     );
-    final id = data['ID'];
+    final order = data['order'];
+    final id = order is Map ? order['ID'] : null;
     if (id is int) return id;
     throw ApiResponseException(
-      'Resposta invalida do servidor.',
-      res.statusCode,
+      'Resposta inválida do servidor.',
+      response.statusCode,
     );
   }
 
-  Future<void> createOrderItem({
-    required int orderId,
-    required int inventoryId,
-    required int quantity,
-    required double price,
-  }) async {
-    final res = await ApiClient.post('/order-items', {
-      'ORDER_ID': orderId,
-      'INVENTORY_ID': inventoryId,
-      'QUANTITY': quantity,
-      'UNIT_PRICE': price,
-      'TOTAL_PRICE': price * quantity,
-    });
-
-    ApiResponse.success(
-      res,
-      expectedStatusCodes: {201},
-      fallback: 'Erro ao criar item do pedido',
-    );
-  }
-
-  Future<List<dynamic>> getOrdersByCustomer(int customerId) async {
+  Future<List<CustomerOrder>> getOrdersByCustomer(int customerId) async {
     final res = await ApiClient.get('/orders/$customerId');
 
-    return ApiResponse.list(
+    final payload = ApiResponse.list(
       res,
       expectedStatusCodes: {200},
       fallback: 'Erro ao buscar pedidos',
     );
+    return payload
+        .whereType<Map>()
+        .map((item) => CustomerOrder.fromJson(Map<String, dynamic>.from(item)))
+        .toList(growable: false);
   }
 
-  Future<Map<String, dynamic>> getOrderDetail(int orderId) async {
+  Future<CustomerOrder> getOrderDetail(int orderId) async {
     final res = await ApiClient.get('/orders/detail/$orderId');
 
-    return ApiResponse.object(
-      res,
-      expectedStatusCodes: {200},
-      fallback: 'Erro ao buscar detalhes do pedido',
+    return CustomerOrder.fromJson(
+      ApiResponse.object(
+        res,
+        expectedStatusCodes: {200},
+        fallback: 'Erro ao buscar detalhes do pedido',
+      ),
     );
+  }
+
+  Future<String> deliveryCode(int orderId) async {
+    final response = await ApiClient.get('/orders/$orderId/delivery-code');
+    final data = ApiResponse.object(
+      response,
+      expectedStatusCodes: {200},
+      fallback: 'Não foi possível consultar o código de entrega.',
+    );
+    final code = data['code'];
+    if (code is! String || !RegExp(r'^\d{4}$').hasMatch(code)) {
+      throw const FormatException('Código de entrega inválido.');
+    }
+    return code;
   }
 }

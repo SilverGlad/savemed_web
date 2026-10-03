@@ -1,4 +1,4 @@
-import 'package:savemed/features/payment/payment_page.dart';
+import 'package:savemed/core/domain/payment_method.dart';
 
 import '../api/api_client.dart';
 import '../api/api_response.dart';
@@ -37,7 +37,7 @@ class PaymentService {
     final status = body['status'];
     if (status is String) return status;
     throw ApiResponseException(
-      'Resposta invalida do servidor.',
+      'Resposta inválida do servidor.',
       response.statusCode,
     );
   }

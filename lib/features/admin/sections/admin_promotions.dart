@@ -1,73 +1,71 @@
 part of '../admin_page.dart';
 
 class _PromotionsPage extends _AdminListPage {
-  const _PromotionsPage({required super.pharmacyId});
+  const _PromotionsPage({required super.pharmacyId, required super.service});
 
   @override
   State<_PromotionsPage> createState() => _PromotionsPageState();
 }
 
-class _PromotionsPageState extends _AdminListPageState<_PromotionsPage> {
+class _PromotionsPageState
+    extends _AdminListPageState<_PromotionsPage, Promotion> {
   @override
-  String get title => 'Promocoes';
+  String get title => 'Promoções';
 
   @override
   String get subtitle =>
-      'Descontos com periodo definido por produto e farmacia.';
+      'Descontos com período definido por produto e farmácia.';
 
   @override
-  String get createLabel => 'Nova promocao';
+  String get createLabel => 'Nova promoção';
 
   @override
-  Future<List<dynamic>> fetch() =>
+  Future<List<Promotion>> fetch() =>
       service.listHighlights(pharmacyId: widget.pharmacyId);
 
-  String _productName(Map<String, dynamic> item) {
-    final product = (item['Medication'] ?? item['medication']) as Map?;
-    return _str(
-      product?['NAME'],
-      fallback: 'Produto #${_str(item['MEDICATION_ID'])}',
-    );
-  }
+  String _productName(Promotion item) => item.productName;
 
-  String _pharmacyName(Map<String, dynamic> item) {
-    final pharmacy = (item['Pharmacy'] ?? item['pharmacy']) as Map?;
-    return _str(
-      pharmacy?['NAME'],
-      fallback: 'Farmacia #${_str(item['PHARMACY_ID'])}',
-    );
-  }
+  String _pharmacyName(Promotion item) => item.pharmacyName;
 
   @override
-  bool matches(Map<String, dynamic> item, String query) =>
-      textMatch(item, query) ||
+  bool matches(Promotion item, String query) =>
       _productName(item).toLowerCase().contains(query) ||
-      _pharmacyName(item).toLowerCase().contains(query);
+      _pharmacyName(item).toLowerCase().contains(query) ||
+      item.id.toString().contains(query);
 
   @override
   List<DataColumn> get columns => const [
     DataColumn(label: Text('Produto')),
-    DataColumn(label: Text('Farmacia')),
+    DataColumn(label: Text('Farmácia')),
     DataColumn(label: Text('Desconto')),
-    DataColumn(label: Text('Periodo')),
+    DataColumn(label: Text('Período')),
     DataColumn(label: Text('Status')),
-    DataColumn(label: Text('Acoes')),
+    DataColumn(label: Text('Ações')),
   ];
 
   @override
-  DataRow buildRow(Map<String, dynamic> item) => DataRow(
+  DataRow buildRow(Promotion item) => DataRow(
     cells: [
-      DataCell(_PrimaryCell(title: _productName(item), subtitle: _id(item))),
+      DataCell(
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _AdminThumbnail(imageUrl: item.image),
+            const SizedBox(width: 10),
+            _PrimaryCell(title: _productName(item), subtitle: 'ID ${item.id}'),
+          ],
+        ),
+      ),
       DataCell(Text(_pharmacyName(item))),
-      DataCell(Text('${_str(item['DISCOUNT_PERCENTAGE'], fallback: '0')}%')),
+      DataCell(Text('${item.discountPercentage}%')),
       DataCell(Text(_period(item))),
       DataCell(_SmallChip(_status(item))),
       DataCell(
         _RowActions(
           onEdit: () => _showDialog(item: item),
           onDelete: () => confirmDelete(
-            itemLabel: 'a promocao de ${_productName(item)}',
-            action: () => service.deleteHighlight(item['ID'] as int),
+            itemLabel: 'a promoção de ${_productName(item)}',
+            action: () => service.deleteHighlight(item.id),
           ),
         ),
       ),
@@ -75,82 +73,89 @@ class _PromotionsPageState extends _AdminListPageState<_PromotionsPage> {
   );
 
   @override
-  Widget buildMobileItem(Map<String, dynamic> item) => _CompactTile(
+  Widget buildMobileItem(Promotion item) => _CompactTile(
     title: _productName(item),
-    subtitle:
-        '${_str(item['DISCOUNT_PERCENTAGE'], fallback: '0')}% - ${_period(item)}',
+    leading: _AdminThumbnail(imageUrl: item.image, size: 72),
+    subtitle: '${item.discountPercentage}% - ${_period(item)}',
     chips: [_SmallChip(_status(item)), _SmallChip(_pharmacyName(item))],
     onEdit: () => _showDialog(item: item),
     onDelete: () => confirmDelete(
-      itemLabel: 'a promocao de ${_productName(item)}',
-      action: () => service.deleteHighlight(item['ID'] as int),
+      itemLabel: 'a promoção de ${_productName(item)}',
+      action: () => service.deleteHighlight(item.id),
     ),
   );
-
-  DateTime? _date(Object? value) => DateTime.tryParse(value?.toString() ?? '');
 
   String _formatDate(DateTime? value) => value == null
       ? '-'
       : '${value.day.toString().padLeft(2, '0')}/${value.month.toString().padLeft(2, '0')}/${value.year}';
 
-  String _period(Map<String, dynamic> item) =>
-      '${_formatDate(_date(item['START_DATE']))} a ${_formatDate(_date(item['END_DATE']))}';
+  String _period(Promotion item) =>
+      '${_formatDate(item.startDate)} a ${_formatDate(item.endDate)}';
 
-  String _status(Map<String, dynamic> item) {
-    final now = DateTime.now();
-    final start = _date(item['START_DATE']);
-    final end = _date(item['END_DATE']);
-    if (start != null && now.isBefore(start)) return 'Agendada';
-    if (end != null && now.isAfter(end.add(const Duration(days: 1)))) {
-      return 'Encerrada';
-    }
+  String _status(Promotion item) {
+    if (item.isScheduled) return 'Agendada';
+    if (item.isEnded) return 'Encerrada';
     return 'Ativa';
   }
 
   @override
   Future<void> onCreate() => _showDialog();
 
-  Future<void> _showDialog({Map<String, dynamic>? item}) async {
-    var pharmacyId = _asInt(item?['PHARMACY_ID']) ?? widget.pharmacyId;
-    var medicationId = _asInt(item?['MEDICATION_ID']);
-    var startDate = _date(item?['START_DATE']) ?? DateTime.now();
-    var endDate =
-        _date(item?['END_DATE']) ?? DateTime.now().add(const Duration(days: 7));
-    final discount = TextEditingController(
-      text: _str(item?['DISCOUNT_PERCENTAGE']),
-    );
+  Future<void> _showDialog({Promotion? item}) async {
+    var pharmacyId = item?.pharmacyId ?? widget.pharmacyId;
+    var medicationId = item?.medicationId;
+    var persistedId = item?.id;
+    _SelectedAdminImage? selectedImage;
+    var startDate = item?.startDate ?? DateTime.now();
+    var endDate = item?.endDate ?? DateTime.now().add(const Duration(days: 7));
     final pharmacies = widget.pharmacyId == null
         ? await loadOptions(
             service.listPharmacies(),
-            'Nao foi possivel carregar as farmacias.',
+            'Não foi possível carregar as farmácias.',
           )
-        : <dynamic>[
-            {'ID': widget.pharmacyId, 'NAME': 'Minha farmacia'},
-          ];
+        : <Pharmacy>[Pharmacy(id: widget.pharmacyId!, name: 'Minha farmácia')];
     final medications = await loadOptions(
       service.listMedications(pharmacyId: widget.pharmacyId),
-      'Nao foi possivel carregar os produtos.',
+      'Não foi possível carregar os produtos.',
     );
     if (pharmacies == null || medications == null || !mounted) return;
+    final discount = TextEditingController(
+      text: item?.discountPercentage.toString() ?? '',
+    );
 
     await _showAdminDialog(
       context: context,
-      title: item == null ? 'Nova promocao' : 'Editar promocao',
+      title: item == null ? 'Nova promoção' : 'Editar promoção',
+      controllers: [discount],
       child: StatefulBuilder(
         builder: (context, setDialogState) => _FormGrid(
           children: [
             _entityDropdown(
-              label: 'Farmacia',
+              label: 'Farmácia',
               value: pharmacyId,
               items: pharmacies,
               enabled: item == null && widget.pharmacyId == null,
-              onChanged: (value) => pharmacyId = value,
+              validator: (value) =>
+                  _requiredEntityValidator(value, 'a farmácia'),
+              onChanged: (value) => setDialogState(() {
+                pharmacyId = value;
+                medicationId = null;
+              }),
             ),
             _entityDropdown(
               label: 'Produto',
               value: medicationId,
-              items: medications,
-              enabled: item == null,
+              items: medications
+                  .where(
+                    (medication) =>
+                        pharmacyId != null &&
+                        (medication.pharmacyId == null ||
+                            medication.pharmacyId == pharmacyId),
+                  )
+                  .toList(),
+              enabled: item == null && pharmacyId != null,
+              validator: (value) =>
+                  _requiredEntityValidator(value, 'o produto'),
               onChanged: (value) => medicationId = value,
             ),
             _input(
@@ -162,10 +167,17 @@ class _PromotionsPageState extends _AdminListPageState<_PromotionsPage> {
               inputFormatters: [
                 FilteringTextInputFormatter.allow(RegExp(r'[0-9,.]')),
               ],
+              validator: (value) {
+                final percentage = _toDouble(value ?? '');
+                if (percentage == null || percentage <= 0 || percentage > 100) {
+                  return 'Informe um desconto entre 0 e 100.';
+                }
+                return null;
+              },
             ),
             OutlinedButton.icon(
               icon: const Icon(Icons.calendar_today_outlined),
-              label: Text('Inicio: ${_formatDate(startDate)}'),
+              label: Text('Início: ${_formatDate(startDate)}'),
               onPressed: () async {
                 final selected = await showDatePicker(
                   context: context,
@@ -191,19 +203,27 @@ class _PromotionsPageState extends _AdminListPageState<_PromotionsPage> {
                 if (selected != null) setDialogState(() => endDate = selected);
               },
             ),
+            _FullWidthFormField(
+              child: _AdminImagePicker(
+                label: 'Imagem da promoção (PNG, JPEG ou WebP)',
+                selectedFilename: selectedImage?.name,
+                hasExistingImage: item?.hasImage ?? false,
+                existingImageUrl: item?.image,
+                selectedBytes: selectedImage?.bytes,
+                onSelected: (file) =>
+                    setDialogState(() => selectedImage = file),
+              ),
+            ),
           ],
         ),
       ),
       onSave: () => handle(() async {
         final percentage = _toDouble(discount.text);
-        final productMatches = medications
-            .whereType<Map<String, dynamic>>()
-            .any(
-              (product) =>
-                  _asInt(product['ID']) == medicationId &&
-                  (_asInt(product['PHARMACY_ID']) == null ||
-                      _asInt(product['PHARMACY_ID']) == pharmacyId),
-            );
+        final productMatches = medications.any(
+          (product) =>
+              product.id == medicationId &&
+              (product.pharmacyId == null || product.pharmacyId == pharmacyId),
+        );
         if (pharmacyId == null ||
             medicationId == null ||
             !productMatches ||
@@ -212,16 +232,25 @@ class _PromotionsPageState extends _AdminListPageState<_PromotionsPage> {
             percentage > 100 ||
             endDate.isBefore(startDate)) {
           throw Exception(
-            'Selecione um produto da farmacia, informe desconto entre 0 e 100 e um periodo valido.',
+            'Selecione um produto da farmácia, informe desconto entre 0 e 100 e um período válido.',
           );
         }
-        await service.saveHighlight({
+        persistedId = await service.saveHighlight({
           'PHARMACY_ID': pharmacyId,
           'MEDICATION_ID': medicationId,
           'DISCOUNT_PERCENTAGE': percentage,
           'START_DATE': startDate.toIso8601String(),
           'END_DATE': endDate.toIso8601String(),
-        }, id: item?['ID'] as int?);
+        }, id: persistedId);
+        final image = selectedImage;
+        if (image != null) {
+          if (!hasCurrentAdminSession) return;
+          await service.uploadHighlightImage(
+            persistedId!,
+            bytes: image.bytes,
+            filename: image.name,
+          );
+        }
       }),
     );
   }
