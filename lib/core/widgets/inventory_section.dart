@@ -1,7 +1,7 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-
 import '../../models/inventory_item.dart';
-import '../theme/app_colors.dart';
+import 'catalog_layout.dart';
 import 'inventory_card.dart';
 
 class InventorySection extends StatefulWidget {
@@ -21,83 +21,87 @@ class InventorySection extends StatefulWidget {
 }
 
 class _InventorySectionState extends State<InventorySection> {
-  final ScrollController _scrollController = ScrollController();
-  double _lastDragX = 0;
+  final _scrollController = ScrollController();
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _scroll(int direction) {
+    if (!_scrollController.hasClients) return;
+    _scrollController.animateTo(
+      (_scrollController.offset + direction * 480).clamp(
+        0,
+        _scrollController.position.maxScrollExtent,
+      ),
+      duration: const Duration(milliseconds: 250),
+      curve: Curves.easeOut,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    final isMobile = MediaQuery.of(context).size.width <= 700;
-
     if (widget.loading) {
       return const Padding(
         padding: EdgeInsets.all(24),
         child: Center(child: CircularProgressIndicator()),
       );
     }
-
-    if (widget.items.isEmpty) {
-      return const SizedBox.shrink();
-    }
-
-    return Container(
-      margin: EdgeInsets.fromLTRB(
-        isMobile ? 12 : 64,
-        0,
-        isMobile ? 12 : 64,
-        18,
-      ),
-      padding: EdgeInsets.all(isMobile ? 18 : 64),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (widget.title.isNotEmpty) ...[
-            Text(widget.title, style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 6),
-            const Text(
-              'Selecao pensada para compra rapida e leitura facil no celular.',
-              style: TextStyle(color: AppColors.textLight),
-            ),
-            const SizedBox(height: 18),
-          ],
-          SizedBox(
-            height: isMobile ? 308 : 356,
-            child: GestureDetector(
-              behavior: HitTestBehavior.translucent,
-              onHorizontalDragStart: (details) {
-                _lastDragX = details.globalPosition.dx;
-              },
-              onHorizontalDragUpdate: (details) {
-                final dx = details.globalPosition.dx;
-                final delta = _lastDragX - dx;
-
-                _scrollController.jumpTo(
-                  (_scrollController.offset + delta).clamp(
-                    _scrollController.position.minScrollExtent,
-                    _scrollController.position.maxScrollExtent,
+    if (widget.items.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 24),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1200),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      widget.title,
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
                   ),
-                );
-
-                _lastDragX = dx;
-              },
-              child: ListView.separated(
-                controller: _scrollController,
-                scrollDirection: Axis.horizontal,
-                physics: const ClampingScrollPhysics(),
-                itemCount: widget.items.length,
-                separatorBuilder: (_, __) =>
-                    SizedBox(width: isMobile ? 12 : 16),
-                itemBuilder: (_, index) {
-                  return InventoryCard(item: widget.items[index]);
-                },
+                  IconButton(
+                    tooltip: 'Produtos anteriores',
+                    onPressed: () => _scroll(-1),
+                    icon: const Icon(Icons.chevron_left),
+                  ),
+                  IconButton(
+                    tooltip: 'Próximos produtos',
+                    onPressed: () => _scroll(1),
+                    icon: const Icon(Icons.chevron_right),
+                  ),
+                ],
               ),
-            ),
+              const SizedBox(height: 8),
+              SizedBox(
+                height: CatalogLayout.cardHeight(context) + 8,
+                child: ScrollConfiguration(
+                  behavior: const MaterialScrollBehavior().copyWith(
+                    dragDevices: {
+                      PointerDeviceKind.mouse,
+                      PointerDeviceKind.touch,
+                      PointerDeviceKind.trackpad,
+                    },
+                  ),
+                  child: ListView.separated(
+                    controller: _scrollController,
+                    scrollDirection: Axis.horizontal,
+                    itemCount: widget.items.length,
+                    separatorBuilder: (_, __) => const SizedBox(width: 12),
+                    itemBuilder: (_, index) =>
+                        InventoryCard(item: widget.items[index]),
+                  ),
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

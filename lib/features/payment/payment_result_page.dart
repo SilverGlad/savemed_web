@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import '../../core/widgets/savemed_header.dart';
-import '../../core/widgets/savemed_footer.dart';
+import '../profile/profile_page.dart';
+import '../../core/theme/app_colors.dart';
 import '../../core/widgets/savemed_button.dart';
 
 class PaymentResultPage extends StatelessWidget {
   final bool success;
+  final int? orderId;
 
-  const PaymentResultPage({super.key, required this.success});
+  const PaymentResultPage({super.key, required this.success, this.orderId});
 
   @override
   Widget build(BuildContext context) {
@@ -14,14 +16,14 @@ class PaymentResultPage extends StatelessWidget {
     final isMobile = width <= 600;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F5F7),
+      backgroundColor: AppColors.background,
       body: Column(
         children: [
           SaveMedHeader(),
 
           Expanded(
             child: SingleChildScrollView(
-              padding: EdgeInsets.all(isMobile ? 16 : 24),
+              padding: EdgeInsets.all(isMobile ? 12 : 24),
               child: Center(
                 child: ConstrainedBox(
                   constraints: BoxConstraints(
@@ -42,14 +44,18 @@ class PaymentResultPage extends StatelessWidget {
                             size: isMobile ? 64 : 72,
                           ),
                           const SizedBox(height: 16),
-                          Text(
-                            success
-                                ? 'Pagamento aprovado!'
-                                : 'Erro no pagamento',
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
+                          Semantics(
+                            header: true,
+                            liveRegion: true,
+                            child: Text(
+                              success
+                                  ? 'Pagamento aprovado!'
+                                  : 'Erro no pagamento',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
                           const SizedBox(height: 12),
@@ -60,18 +66,37 @@ class PaymentResultPage extends StatelessWidget {
                             textAlign: TextAlign.center,
                           ),
                           const SizedBox(height: 24),
+                          if (orderId != null) Text('Pedido #$orderId'),
+                          if (success) ...[
+                            const SizedBox(height: 12),
+                            FilledButton.icon(
+                              onPressed: () => Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      const ProfilePage(initialTab: 2),
+                                ),
+                              ),
+                              icon: const Icon(Icons.receipt_long_outlined),
+                              label: const Text('Acompanhar pedido'),
+                            ),
+                            const SizedBox(height: 12),
+                          ],
                           SizedBox(
                             width: double.infinity,
                             height: 48,
                             child: SaveMedButton(
                               label: success
-                                  ? 'Voltar para a loja'
-                                  : 'Tentar novamente',
+                                  ? 'Continuar comprando'
+                                  : 'Voltar ao pagamento',
                               onPressed: () {
-                                Navigator.popUntil(
-                                  context,
-                                  (route) => route.isFirst,
-                                );
+                                if (success) {
+                                  Navigator.popUntil(
+                                    context,
+                                    (route) => route.isFirst,
+                                  );
+                                } else {
+                                  Navigator.of(context).maybePop();
+                                }
                               },
                             ),
                           ),
@@ -83,8 +108,6 @@ class PaymentResultPage extends StatelessWidget {
               ),
             ),
           ),
-
-          const SaveMedFooter(),
         ],
       ),
     );

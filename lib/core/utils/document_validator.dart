@@ -24,6 +24,7 @@ bool isValidCPF(String cpf) {
 bool isValidCNPJ(String cnpj) {
   cnpj = cnpj.replaceAll(RegExp(r'\D'), '');
   if (cnpj.length != 14) return false;
+  if (RegExp(r'^(\d)\1*$').hasMatch(cnpj)) return false;
 
   final weight1 = [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
   final weight2 = [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];

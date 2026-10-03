@@ -1,38 +1,47 @@
-import 'dart:convert';
 import '../api/api_client.dart';
+import '../api/api_response.dart';
+import '../../models/postal_address.dart';
 
 class AddressService {
-  Future<List<dynamic>> getUserAddresses(int userId) async {
-    final res = await ApiClient.get('/addresses/user/$userId', query: {});
-
-    if (res.statusCode != 200) {
-      throw Exception('Erro ao buscar endereços');
-    }
-
-    return jsonDecode(res.body);
+  Future<List<PostalAddress>> getUserAddresses(int userId) async {
+    final response = await ApiClient.get('/addresses/user/$userId');
+    return ApiResponse.objects(
+      response,
+      expectedStatusCodes: {200},
+      fallback: 'Erro ao buscar endereços',
+    ).map(PostalAddress.fromJson).toList(growable: false);
   }
 
-  Future<void> createAddress(Map<String, dynamic> data) async {
-    final res = await ApiClient.post('/addresses', data);
-
-    if (res.statusCode != 201) {
-      throw Exception('Erro ao criar endereço');
-    }
+  Future<void> createAddress(PostalAddress address) async {
+    final response = await ApiClient.post(
+      '/addresses',
+      address.toRequestJson(),
+    );
+    ApiResponse.success(
+      response,
+      expectedStatusCodes: {201},
+      fallback: 'Erro ao criar endereço',
+    );
   }
 
-  Future<void> updateAddress(int id, Map<String, dynamic> data) async {
-    final res = await ApiClient.put('/addresses/$id', data);
-
-    if (res.statusCode != 200) {
-      throw Exception('Erro ao atualizar endereço');
-    }
+  Future<void> updateAddress(int id, PostalAddress address) async {
+    final response = await ApiClient.put(
+      '/addresses/$id',
+      address.toRequestJson(),
+    );
+    ApiResponse.success(
+      response,
+      expectedStatusCodes: {200},
+      fallback: 'Erro ao atualizar endereço',
+    );
   }
 
   Future<void> deleteAddress(int id) async {
-    final res = await ApiClient.delete('/addresses/$id');
-
-    if (res.statusCode != 200) {
-      throw Exception('Erro ao remover endereço');
-    }
+    final response = await ApiClient.delete('/addresses/$id');
+    ApiResponse.success(
+      response,
+      expectedStatusCodes: {200, 204},
+      fallback: 'Erro ao remover endereço',
+    );
   }
 }

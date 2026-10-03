@@ -1,4 +1,7 @@
 # Miscellaneous
+.env
+.env.*
+!.env.example
 *.class
 *.log
 *.pyc
@@ -17,6 +20,7 @@ migrate_working_dir/
 *.ipr
 *.iws
 .idea/
+.vscode/
 
 # The .vscode folder contains launch configuration and tasks you configure in
 # VS Code which you may wish to be included in version control, so this line
@@ -32,6 +36,14 @@ migrate_working_dir/
 .pub-cache/
 .pub/
 /build/
+test/**/failures/
+.chrome-savemed-check/
+.chrome-*/
+.edge-*/
+.incident-*.png
+.remote-main.dart.js
+.deploy-backup-*/
+.deployment-backups/
 
 # Symbolication related
 app.*.symbols
