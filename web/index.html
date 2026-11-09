@@ -14,9 +14,10 @@
     This is a placeholder for base href that will be replaced by the value of
     the `--base-href` argument provided to `flutter build`.
   -->
-  <base href="/savemed/">
+  <base href="$FLUTTER_BASE_HREF">
 
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
   <meta
     name="description"
@@ -35,8 +36,105 @@
 
   <title>SaveMed</title>
   <link rel="manifest" href="manifest.json">
+  <style>
+    html,
+    body {
+      height: 100%;
+      margin: 0;
+      background: #f7f9f8;
+    }
+
+    #app-loading {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      color: #24332d;
+      font-family: Arial, sans-serif;
+      text-align: center;
+      background: #f7f9f8;
+      transition: opacity 180ms ease-out;
+    }
+
+    #app-loading.is-ready {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .app-loading__spinner {
+      width: 36px;
+      height: 36px;
+      margin: 0 auto 20px;
+      border: 4px solid #d7e3de;
+      border-top-color: #087f5b;
+      border-radius: 50%;
+      animation: app-loading-spin 800ms linear infinite;
+    }
+
+    .app-loading__title {
+      margin: 0 0 8px;
+      font-size: 20px;
+      font-weight: 700;
+    }
+
+    .app-loading__message {
+      max-width: 420px;
+      margin: 0;
+      color: #52615b;
+      font-size: 15px;
+      line-height: 1.5;
+    }
+
+    .app-loading__retry {
+      display: none;
+      min-height: 44px;
+      margin: 20px auto 0;
+      padding: 0 20px;
+      border: 0;
+      border-radius: 6px;
+      color: #ffffff;
+      font-size: 15px;
+      font-weight: 700;
+      background: #087f5b;
+      cursor: pointer;
+    }
+
+    #app-loading.has-error .app-loading__spinner {
+      display: none;
+    }
+
+    #app-loading.has-error .app-loading__retry {
+      display: block;
+    }
+
+    @keyframes app-loading-spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .app-loading__spinner {
+        animation-duration: 1600ms;
+      }
+    }
+  </style>
 </head>
 <body>
+  <div id="app-loading" role="status" aria-live="polite">
+    <div>
+      <div class="app-loading__spinner" aria-hidden="true"></div>
+      <p class="app-loading__title">Carregando a SaveMed</p>
+      <p class="app-loading__message" id="app-loading-message">
+        Estamos preparando o aplicativo. Isso pode levar alguns segundos.
+      </p>
+      <button class="app-loading__retry" id="app-loading-retry" type="button">
+        Tentar novamente
+      </button>
+    </div>
+  </div>
   <script>
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.getRegistrations().then((registrations) => {
@@ -47,7 +145,38 @@
     if ('caches' in window) {
       caches.keys().then((keys) => keys.forEach((key) => caches.delete(key)));
     }
+
+    const loadingElement = document.getElementById('app-loading');
+    const loadingMessage = document.getElementById('app-loading-message');
+    const retryButton = document.getElementById('app-loading-retry');
+    let applicationStarted = false;
+    let startupFailed = false;
+
+    const finishLoading = () => {
+      if (applicationStarted) return;
+      applicationStarted = true;
+      loadingElement.classList.add('is-ready');
+      window.setTimeout(() => loadingElement.remove(), 200);
+    };
+
+    const showLoadingError = () => {
+      if (applicationStarted || startupFailed) return;
+      startupFailed = true;
+      loadingElement.classList.add('has-error');
+      loadingMessage.textContent =
+        'Não foi possível iniciar o aplicativo. Verifique sua conexão e tente novamente.';
+    };
+
+    window.addEventListener('savemed-app-ready', finishLoading, { once: true });
+    window.addEventListener('savemed-app-error', showLoadingError, { once: true });
+
+    window.setTimeout(() => {
+      if (applicationStarted || startupFailed) return;
+      showLoadingError();
+    }, 20000);
+
+    retryButton.addEventListener('click', () => window.location.reload());
   </script>
-  <script src="flutter_bootstrap.js?v=20260422-1" async></script>
+  <script src="flutter_bootstrap.js?v=20260928-startup" async></script>
 </body>
 </html>

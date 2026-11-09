@@ -1,7 +1,6 @@
-import 'dart:convert';
-
 import '../../models/subcategory.dart';
 import '../api/api_client.dart';
+import '../api/api_response.dart';
 
 class SubcategoryService {
   Future<List<Subcategory>> getByCategory(int categoryId) async {
@@ -9,13 +8,14 @@ class SubcategoryService {
       '/subcategories',
       query: {'category_id': '$categoryId'},
     );
-
-    if (response.statusCode != 200) {
-      throw Exception('Erro ao buscar subcategorias');
-    }
-
-    final data = jsonDecode(response.body) as List;
-
-    return data.map((e) => Subcategory.fromJson(e)).toList();
+    final data = ApiResponse.list(
+      response,
+      expectedStatusCodes: {200},
+      fallback: 'Erro ao buscar subcategorias',
+    );
+    return data
+        .whereType<Map<String, dynamic>>()
+        .map(Subcategory.fromJson)
+        .toList();
   }
 }

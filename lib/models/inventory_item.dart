@@ -1,5 +1,6 @@
-import 'package:SaveMed/models/medication.dart';
-import 'package:SaveMed/models/pharmacy.dart';
+import 'package:savemed/models/medication.dart';
+import 'package:savemed/models/pharmacy.dart';
+import 'package:savemed/core/utils/number_parser.dart';
 
 class InventoryItem {
   final int id;
@@ -29,18 +30,48 @@ class InventoryItem {
   }
 
   /// Produto disponível em estoque
-  bool get available => stock > 0;
+  bool get available => stock > 0 && pharmacy.isActive && pharmacy.isOpen;
 
-  factory InventoryItem.fromJson(Map<String, dynamic> json) {
+  String get unavailableLabel =>
+      !pharmacy.isOpen || !pharmacy.isActive ? 'Loja fechada' : 'Esgotado';
+
+  factory InventoryItem.fromJson(
+    Map<String, dynamic> json, {
+    Pharmacy? pharmacyFallback,
+  }) {
+    final id = _asInt(json['ID']);
+    final price = _asDouble(json['PRICE']);
+    final stock = _asInt(json['STOCK']);
+    final rawPharmacy = json['Pharmacy'];
+    final pharmacy = rawPharmacy is Map<String, dynamic>
+        ? Pharmacy.fromJson(rawPharmacy)
+        : pharmacyFallback;
+    final medication = json['Medication'];
+
+    if (id == null ||
+        price == null ||
+        stock == null ||
+        pharmacy == null ||
+        medication is! Map<String, dynamic>) {
+      throw const FormatException('Item de estoque com dados inválidos.');
+    }
+
     return InventoryItem(
-      id: json['ID'],
-      price: double.parse(json['PRICE'].toString()),
-      originalPrice: json['ORIGINAL_PRICE'] != null
-          ? double.parse(json['ORIGINAL_PRICE'].toString())
-          : double.parse(json['PRICE'].toString()),
-      stock: json['STOCK'],
-      pharmacy: Pharmacy.fromJson(json['Pharmacy']),
-      medication: Medication.fromJson(json['Medication']),
+      id: id,
+      price: price,
+      originalPrice: _asDouble(json['ORIGINAL_PRICE']) ?? price,
+      stock: stock,
+      pharmacy: pharmacy,
+      medication: Medication.fromJson(medication),
     );
+  }
+
+  static int? _asInt(Object? value) {
+    if (value is int) return value;
+    return int.tryParse(value?.toString() ?? '');
+  }
+
+  static double? _asDouble(Object? value) {
+    return parseFiniteNumber(value);
   }
 }

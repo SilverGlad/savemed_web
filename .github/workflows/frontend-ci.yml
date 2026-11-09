@@ -1,0 +1,55 @@
+name: Frontend CI
+
+on:
+  pull_request:
+  push:
+    branches: [main, master]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: windows-2025
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version: 3.41.4
+      - run: flutter pub get --enforce-lockfile
+      - name: Check Pub security advisories
+        run: dart run scripts/check_pub_advisories.dart
+      - run: dart format --output=none --set-exit-if-changed lib test scripts
+      - run: flutter analyze
+      - run: flutter test --concurrency=1
+      - run: flutter build web --release --base-href /savemed/ --no-web-resources-cdn
+      - name: Test web entrypoint fingerprinting
+        shell: pwsh
+        run: ./scripts/test_fingerprint_web_entrypoint.ps1
+      - name: Fingerprint the Flutter web entrypoint for immutable caching
+        shell: pwsh
+        run: ./scripts/fingerprint_web_entrypoint.ps1 -WebRoot build/web
+      - name: Compile Android debug APK
+        run: flutter build apk --debug
+
+  browser-semantics:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version: 3.41.4
+      - run: flutter pub get --enforce-lockfile
+      - name: Test auth, registration and pharmacy operations in Chrome
+        run: >-
+          flutter test --platform chrome test/widget_test.dart
+          test/features/admin/pharmacy_operation_test.dart
+          test/features/auth/password_recovery_test.dart
+          test/features/auth/registration_flow_test.dart
+          test/features/home/home_header_test.dart

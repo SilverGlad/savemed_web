@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:savemed/core/utils/document_formatter.dart';
 import 'package:provider/provider.dart';
 
-import 'package:SaveMed/core/controllers/auth_controller.dart';
-import 'package:SaveMed/core/controllers/cart_controller.dart';
-import 'package:SaveMed/core/controllers/order_controller.dart';
-import 'package:SaveMed/core/theme/app_colors.dart';
-import 'package:SaveMed/core/widgets/savemed_button.dart';
-import 'package:SaveMed/core/widgets/savemed_footer.dart';
-import 'package:SaveMed/core/widgets/savemed_header.dart';
-import 'package:SaveMed/features/payment/payment_page.dart';
+import 'package:savemed/core/controllers/auth_controller.dart';
+import 'package:savemed/core/controllers/cart_controller.dart';
+import 'package:savemed/core/controllers/order_controller.dart';
+import 'package:savemed/core/services/shipping_service.dart';
+import 'package:savemed/core/theme/app_colors.dart';
+import 'package:savemed/core/widgets/savemed_button.dart';
+import 'package:savemed/core/widgets/savemed_footer.dart';
+import 'package:savemed/core/widgets/savemed_header.dart';
+import 'package:savemed/features/payment/payment_page.dart';
 
 class CheckoutPage extends StatelessWidget {
   const CheckoutPage({super.key});
@@ -17,6 +19,7 @@ class CheckoutPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final cart = context.watch<CartController>();
     final auth = context.watch<AuthController>();
+    final isMobile = MediaQuery.of(context).size.width < 640;
 
     if (cart.items.isEmpty) {
       return const Scaffold(body: Center(child: Text('Carrinho vazio')));
@@ -29,7 +32,12 @@ class CheckoutPage extends StatelessWidget {
           SaveMedHeader(),
           Expanded(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(16, 18, 16, 28),
+              padding: EdgeInsets.fromLTRB(
+                isMobile ? 12 : 24,
+                18,
+                isMobile ? 12 : 24,
+                28,
+              ),
               child: Center(
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 1160),
@@ -80,148 +88,17 @@ class CheckoutPage extends StatelessWidget {
 
 class _CheckoutHero extends StatelessWidget {
   final CartController cart;
-
   const _CheckoutHero({required this.cart});
 
   @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(22),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(28),
-        gradient: const LinearGradient(
-          colors: [Color(0xFFF8FFFD), Color(0xFFE3F4EF)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Wrap(
-        runSpacing: 14,
-        spacing: 14,
-        alignment: WrapAlignment.spaceBetween,
-        children: [
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 620),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: const Text(
-                    'Checkout',
-                    style: TextStyle(
-                      color: AppColors.primaryDark,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 14),
-                Text(
-                  'Confirme entrega, itens e valores antes do pagamento.',
-                  style: theme.textTheme.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'O fluxo esta organizado para leitura rapida no celular, sem esconder informacoes importantes.',
-                  style: theme.textTheme.bodyLarge,
-                ),
-              ],
-            ),
-          ),
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: [
-              _HeroPill(
-                label: 'Itens',
-                value: '${cart.totalItems}',
-                icon: Icons.shopping_bag_outlined,
-              ),
-              _HeroPill(
-                label: 'Frete',
-                value: _format(_shippingPrice(cart.selectedShipping)),
-                icon: Icons.local_shipping_outlined,
-              ),
-              _HeroPill(
-                label: 'Total',
-                value: _format(
-                  cart.subtotal + _shippingPrice(cart.selectedShipping),
-                ),
-                icon: Icons.payments_outlined,
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _HeroPill extends StatelessWidget {
-  final String label;
-  final String value;
-  final IconData icon;
-
-  const _HeroPill({
-    required this.label,
-    required this.value,
-    required this.icon,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 140,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(22),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 16,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, color: AppColors.primaryDark, size: 20),
-          const SizedBox(height: 10),
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: AppColors.textLight,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: const TextStyle(
-              fontWeight: FontWeight.w800,
-              color: AppColors.textDark,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text('Revisar pedido', style: Theme.of(context).textTheme.headlineSmall),
+      const SizedBox(height: 8),
+      Text(cart.pharmacyName ?? 'Confirme os itens e a entrega'),
+    ],
+  );
 }
 
 class _LeftColumn extends StatelessWidget {
@@ -239,9 +116,12 @@ class _LeftColumn extends StatelessWidget {
           icon: Icons.person_outline,
           child: Column(
             children: [
-              _InfoRow(label: 'Cliente', value: auth.user?['NAME'] ?? '-'),
-              _InfoRow(label: 'Email', value: auth.user?['EMAIL'] ?? '-'),
-              _InfoRow(label: 'Documento', value: auth.user?['CPF'] ?? '-'),
+              _InfoRow(label: 'Cliente', value: auth.user?.name ?? '-'),
+              _InfoRow(label: 'Email', value: auth.user?.email ?? '-'),
+              _InfoRow(
+                label: 'Documento',
+                value: formatCpfForDisplay(auth.user?.cpf),
+              ),
             ],
           ),
         ),
@@ -254,7 +134,7 @@ class _LeftColumn extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Retirada diretamente na farmacia.',
+                      'Retirada diretamente na farmácia.',
                       style: TextStyle(
                         fontWeight: FontWeight.w700,
                         color: AppColors.textDark,
@@ -262,7 +142,7 @@ class _LeftColumn extends StatelessWidget {
                     ),
                     SizedBox(height: 6),
                     Text(
-                      'Nao e necessario informar endereco de entrega para este pedido.',
+                      'Não é necessário informar endereço de entrega para este pedido.',
                       style: TextStyle(color: AppColors.textLight),
                     ),
                   ],
@@ -271,7 +151,7 @@ class _LeftColumn extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '${cart.selectedAddress?['STREET']}, ${cart.selectedAddress?['NUMBER'] ?? 's/n'}',
+                      '${cart.selectedAddress?.street}, ${cart.selectedAddress?.number ?? 's/n'}',
                       style: const TextStyle(
                         fontWeight: FontWeight.w700,
                         color: AppColors.textDark,
@@ -279,12 +159,12 @@ class _LeftColumn extends StatelessWidget {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      '${cart.selectedAddress?['NEIGHBORHOOD'] ?? ''} ${cart.selectedAddress?['CITY']} - ${cart.selectedAddress?['STATE']}',
+                      '${cart.selectedAddress?.neighborhood ?? ''} ${cart.selectedAddress?.city} - ${cart.selectedAddress?.state}',
                       style: const TextStyle(color: AppColors.textLight),
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      'CEP ${cart.selectedAddress?['CEP'] ?? '-'}',
+                      'CEP ${cart.selectedAddress?.cep ?? '-'}',
                       style: const TextStyle(color: AppColors.textLight),
                     ),
                   ],
@@ -430,13 +310,13 @@ class _RightColumn extends StatelessWidget {
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
             color: const Color(0xFF173630),
-            borderRadius: BorderRadius.circular(24),
+            borderRadius: BorderRadius.circular(8),
           ),
           child: const Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Proximo passo',
+                'Próximo passo',
                 style: TextStyle(
                   color: Colors.white70,
                   fontSize: 12,
@@ -445,7 +325,7 @@ class _RightColumn extends StatelessWidget {
               ),
               SizedBox(height: 8),
               Text(
-                'Ao continuar, o pedido sera criado e a cobranca sera iniciada na etapa de pagamento.',
+                'Ao continuar, o pedido será criado e a cobrança será iniciada na etapa de pagamento.',
                 style: TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.w600,
@@ -474,24 +354,24 @@ class _RightColumn extends StatelessWidget {
 
     try {
       final orderId = await orderCtrl.createOrder(
-        customerId: auth.user!['ID'],
+        customerId: auth.user!.id,
         pharmacyId: cart.pharmacyId!,
-        addressId: cart.selectedAddress?['ID'],
+        addressId: cart.selectedAddress?.id,
         shipping: cart.selectedShipping!,
         subtotal: cart.subtotal,
+        items: cart.items,
       );
-
-      await orderCtrl.createOrderItems(orderId, cart.items);
 
       if (!context.mounted) return;
       navigator.push(
         MaterialPageRoute(builder: (_) => PaymentPage(orderId: orderId)),
       );
-    } catch (_) {
+    } catch (error) {
       if (!context.mounted) return;
-      messenger.showSnackBar(
-        const SnackBar(content: Text('Erro ao criar pedido')),
-      );
+      final message = error is ShippingQuoteException
+          ? error.message
+          : 'Não foi possível criar o pedido. Tente novamente.';
+      messenger.showSnackBar(SnackBar(content: Text(message)));
     }
   }
 }
@@ -618,12 +498,12 @@ String _shippingSubtitle(Map<String, dynamic>? shipping) {
 
   final method = shipping['method']?.toString();
   if (method == 'pickup') {
-    return shipping['description']?.toString() ?? 'Retirada na farmacia.';
+    return shipping['description']?.toString() ?? 'Retirada na farmácia.';
   }
 
   if (method == 'own_delivery') {
     return shipping['description']?.toString() ??
-        'Entrega realizada pela farmacia.';
+        'Entrega realizada pela farmácia.';
   }
 
   final deliveryTime = shipping['delivery_time']?.toString();

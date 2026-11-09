@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'home_inventory_controller.dart';
 import '../../models/inventory_item.dart';
+import '../logging/app_logger.dart';
 
 class SearchController extends ChangeNotifier {
   final HomeInventoryController home;
@@ -27,17 +28,20 @@ class SearchController extends ChangeNotifier {
       ...home.bestSellers,
     ];
 
-    products = allItems.where((item) {
+    final matching = allItems.where((item) {
       final med = item.medication;
 
       final text = ('${med.name} ${med.description} ').toLowerCase();
 
       return text.contains(q);
-    }).toList();
+    });
+    final unique = <int, InventoryItem>{};
+    for (final item in matching) {
+      unique[item.id] = item;
+    }
+    products = unique.values.toList();
 
-    debugPrint('SEARCH → inventory items: ${allItems.length}');
-    debugPrint('SEARCH → query: $query');
-    debugPrint('SEARCH → products found: ${products.length}');
+    AppLogger.event(AppLogEvent.catalogSearchCompleted);
 
     notifyListeners();
   }

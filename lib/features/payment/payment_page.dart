@@ -1,23 +1,23 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:savemed/core/domain/order_status.dart';
+import 'package:savemed/core/domain/payment_method.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
-import 'package:SaveMed/core/controllers/auth_controller.dart';
-import 'package:SaveMed/core/controllers/card_controller.dart';
-import 'package:SaveMed/core/controllers/cart_controller.dart';
-import 'package:SaveMed/core/controllers/payment_controller.dart';
-import 'package:SaveMed/core/theme/app_colors.dart';
-import 'package:SaveMed/core/widgets/add_card_modal.dart';
-import 'package:SaveMed/core/widgets/savemed_button.dart';
-import 'package:SaveMed/core/widgets/savemed_footer.dart';
-import 'package:SaveMed/core/widgets/savemed_header.dart';
+import 'package:savemed/core/controllers/auth_controller.dart';
+import 'package:savemed/core/controllers/card_controller.dart';
+import 'package:savemed/core/controllers/cart_controller.dart';
+import 'package:savemed/core/controllers/payment_controller.dart';
+import 'package:savemed/core/theme/app_colors.dart';
+import 'package:savemed/core/widgets/add_card_modal.dart';
+import 'package:savemed/core/widgets/savemed_button.dart';
+import 'package:savemed/core/widgets/savemed_footer.dart';
+import 'package:savemed/core/widgets/savemed_header.dart';
 
 import 'payment_result_page.dart';
-
-enum PaymentMethod { credit, debit, pix }
 
 class PaymentPage extends StatefulWidget {
   final int orderId;
@@ -28,11 +28,15 @@ class PaymentPage extends StatefulWidget {
   State<PaymentPage> createState() => _PaymentPageState();
 }
 
-class _PaymentPageState extends State<PaymentPage> {
+class _PaymentPageState extends State<PaymentPage> with WidgetsBindingObserver {
   PaymentMethod _method = PaymentMethod.credit;
   String? _pixQrCode;
   bool _pixGenerated = false;
-  Timer? _pixPollingTimer;
+  bool _paymentPending = false;
+  bool _checkingStatus = false;
+  String? _statusMessage;
+  Timer? _paymentPollingTimer;
+  CardController? _cardController;
 
   bool get _usesCard =>
       _method == PaymentMethod.credit || _method == PaymentMethod.debit;
@@ -40,41 +44,82 @@ class _PaymentPageState extends State<PaymentPage> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      context.read<CardController>().loadCards();
+      _cardController?.loadCards();
     });
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) return;
+    final hasCardDetails =
+        _cardController?.selected != null ||
+        (_cardController?.cards.isNotEmpty ?? false);
+    if (!hasCardDetails) return;
+    _cardController?.clear();
+    if (mounted) {
+      setState(() {
+        _statusMessage =
+            'Por segurança, os dados do cartão foram apagados. Informe-os novamente para continuar.';
+      });
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _cardController ??= context.read<CardController>();
+  }
+
+  @override
   void dispose() {
-    _pixPollingTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    _paymentPollingTimer?.cancel();
+    _cardController?.clearForRouteExit();
     super.dispose();
   }
 
   void _resetPix() {
-    _pixPollingTimer?.cancel();
+    _paymentPollingTimer?.cancel();
     _pixGenerated = false;
     _pixQrCode = null;
   }
 
-  void _startPixPolling() {
+  void _startPaymentPolling() {
     final paymentCtrl = context.read<PaymentController>();
     final cartController = context.read<CartController>();
 
-    _pixPollingTimer?.cancel();
-    _pixPollingTimer = Timer.periodic(const Duration(seconds: 5), (
+    _paymentPollingTimer?.cancel();
+    _paymentPollingTimer = Timer.periodic(const Duration(seconds: 5), (
       timer,
     ) async {
+      if (_checkingStatus || !mounted) return;
+      _checkingStatus = true;
       final status = await paymentCtrl.checkStatus(orderId: widget.orderId);
+      _checkingStatus = false;
+      if (!mounted) return;
 
-      if (status == 'paid') {
+      if (PaymentStatus.fromApi(status) == PaymentStatus.failed) {
+        timer.cancel();
+        setState(() {
+          _paymentPending = false;
+          _pixGenerated = false;
+          _statusMessage =
+              'Pagamento não aprovado. Escolha outra forma de pagamento.';
+        });
+        return;
+      }
+
+      if (PaymentStatus.fromApi(status) == PaymentStatus.paid) {
         timer.cancel();
         if (!mounted) return;
         cartController.clear();
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
-            builder: (_) => const PaymentResultPage(success: true),
+            builder: (_) =>
+                PaymentResultPage(success: true, orderId: widget.orderId),
           ),
         );
       }
@@ -90,6 +135,7 @@ class _PaymentPageState extends State<PaymentPage> {
     final total = cart.subtotal + _shippingPrice(cart.selectedShipping);
     final width = MediaQuery.of(context).size.width;
     final isDesktop = width >= 960;
+    final horizontalPadding = width < 640 ? 12.0 : 24.0;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -98,7 +144,12 @@ class _PaymentPageState extends State<PaymentPage> {
           SaveMedHeader(),
           Expanded(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(16, 18, 16, 28),
+              padding: EdgeInsets.fromLTRB(
+                horizontalPadding,
+                18,
+                horizontalPadding,
+                28,
+              ),
               child: Center(
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 1140),
@@ -187,45 +238,88 @@ class _PaymentPageState extends State<PaymentPage> {
         ),
         const SizedBox(height: 8),
         const Text(
-          'Escolha o metodo e conclua a cobranca sem sair do fluxo.',
+          'Escolha o método e conclua a cobrança sem sair do fluxo.',
           style: TextStyle(color: AppColors.textLight),
         ),
         const SizedBox(height: 18),
-        Row(
-          children: [
-            _PaymentMethodButton(
-              label: 'Credito',
-              icon: Icons.credit_card_outlined,
-              selected: _method == PaymentMethod.credit,
-              onTap: () => setState(() {
-                _method = PaymentMethod.credit;
-                _resetPix();
-              }),
-            ),
-            const SizedBox(width: 8),
-            _PaymentMethodButton(
-              label: 'Debito',
-              icon: Icons.account_balance_wallet_outlined,
-              selected: _method == PaymentMethod.debit,
-              onTap: () => setState(() {
-                _method = PaymentMethod.debit;
-                _resetPix();
-              }),
-            ),
-            const SizedBox(width: 8),
-            _PaymentMethodButton(
-              label: 'Pix',
-              icon: Icons.qr_code_2_outlined,
-              selected: _method == PaymentMethod.pix,
-              onTap: () => setState(() {
-                _method = PaymentMethod.pix;
-                _resetPix();
-              }),
-            ),
-          ],
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final buttons = [
+              _PaymentMethodButton(
+                label: 'Crédito',
+                icon: Icons.credit_card_outlined,
+                selected: _method == PaymentMethod.credit,
+                enabled: !_paymentPending && !paymentCtrl.loading,
+                onTap: () => setState(() {
+                  if (_paymentPending || paymentCtrl.loading) return;
+                  _method = PaymentMethod.credit;
+                  _resetPix();
+                }),
+              ),
+              _PaymentMethodButton(
+                label: 'Débito',
+                icon: Icons.account_balance_wallet_outlined,
+                selected: _method == PaymentMethod.debit,
+                enabled: !_paymentPending && !paymentCtrl.loading,
+                onTap: () => setState(() {
+                  if (_paymentPending || paymentCtrl.loading) return;
+                  _method = PaymentMethod.debit;
+                  _resetPix();
+                }),
+              ),
+              _PaymentMethodButton(
+                label: 'Pix',
+                icon: Icons.qr_code_2_outlined,
+                selected: _method == PaymentMethod.pix,
+                enabled: !_paymentPending && !paymentCtrl.loading,
+                onTap: () => setState(() {
+                  if (_paymentPending || paymentCtrl.loading) return;
+                  _method = PaymentMethod.pix;
+                  _resetPix();
+                }),
+              ),
+            ];
+
+            if (constraints.maxWidth < 420) {
+              return Column(
+                children: [
+                  for (var index = 0; index < buttons.length; index++) ...[
+                    SizedBox(width: double.infinity, child: buttons[index]),
+                    if (index != buttons.length - 1) const SizedBox(height: 8),
+                  ],
+                ],
+              );
+            }
+
+            return Row(
+              children: [
+                for (var index = 0; index < buttons.length; index++) ...[
+                  Expanded(child: buttons[index]),
+                  if (index != buttons.length - 1) const SizedBox(width: 8),
+                ],
+              ],
+            );
+          },
         ),
         const SizedBox(height: 20),
+        if (_paymentPending || _statusMessage != null) ...[
+          Semantics(
+            liveRegion: true,
+            child: Text(
+              _paymentPending
+                  ? (_statusMessage ??
+                        'Pagamento em processamento. Aguarde a confirmação. Não pague novamente.')
+                  : _statusMessage!,
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
         if (_usesCard) ...[
+          const Text(
+            'Por segurança, os dados do cartão não ficam salvos. Em outra tentativa, informe-os novamente.',
+            style: TextStyle(color: AppColors.textLight),
+          ),
+          const SizedBox(height: 12),
           _CardSelectionPanel(cardCtrl: cardCtrl),
           const SizedBox(height: 18),
         ],
@@ -241,6 +335,7 @@ class _PaymentPageState extends State<PaymentPage> {
           loading: paymentCtrl.loading,
           onPressed:
               paymentCtrl.loading ||
+                  _paymentPending ||
                   (_usesCard && cardCtrl.selected == null) ||
                   (_method == PaymentMethod.pix && _pixGenerated)
               ? null
@@ -268,7 +363,7 @@ class _PaymentPageState extends State<PaymentPage> {
     final messenger = ScaffoldMessenger.of(context);
     final navigator = Navigator.of(context);
 
-    final result = await paymentCtrl.pay(
+    final paymentRequest = paymentCtrl.pay(
       orderId: widget.orderId,
       amount: total,
       method: _method,
@@ -282,47 +377,92 @@ class _PaymentPageState extends State<PaymentPage> {
             }
           : null,
       customer: {
-        'name': auth.user?['NAME'],
-        'email': auth.user?['EMAIL'],
-        'document': auth.user?['CPF'],
-        'phone': auth.user?['PHONE_NUMBER'],
+        'name': auth.user?.name,
+        'email': auth.user?.email,
+        'document': auth.user?.cpf,
+        'phone': auth.user?.phoneNumber,
         'address': cart.selectedAddress == null
             ? null
             : {
-                'zip_code': cart.selectedAddress!['CEP'],
-                'city': cart.selectedAddress!['CITY'],
-                'state': cart.selectedAddress!['STATE'],
+                'zip_code': cart.selectedAddress!.cep,
+                'city': cart.selectedAddress!.city,
+                'state': cart.selectedAddress!.state,
                 'line_1':
-                    '${cart.selectedAddress!['STREET']}, ${cart.selectedAddress!['NUMBER']}',
+                    '${cart.selectedAddress!.street}, ${cart.selectedAddress!.number ?? ''}',
                 'country': 'BR',
               },
       },
       deviceId: 'web-device',
     );
+    if (_usesCard) cardCtrl.clear();
+    final result = await paymentRequest;
 
     if (!context.mounted) return;
+
+    if (result['status'] == 'pending' || result['code'] == 'PAYMENT_PENDING') {
+      setState(() => _paymentPending = true);
+      _startPaymentPolling();
+      return;
+    }
 
     if (result['success'] == true) {
       if (_method == PaymentMethod.pix) {
         setState(() {
+          _paymentPending = true;
           _pixGenerated = true;
           _pixQrCode = result['qr_code'];
         });
-        _startPixPolling();
+        _startPaymentPolling();
         return;
       }
 
+      if (result['status'] != 'paid') {
+        setState(() => _paymentPending = true);
+        _startPaymentPolling();
+        return;
+      }
       context.read<CartController>().clear();
       navigator.pushReplacement(
         MaterialPageRoute(
-          builder: (_) => const PaymentResultPage(success: true),
+          builder: (_) =>
+              PaymentResultPage(success: true, orderId: widget.orderId),
         ),
       );
       return;
     }
 
     final message =
-        result['message'] ?? 'Pagamento nao autorizado. Tente outro metodo.';
+        result['message'] ?? 'Pagamento não autorizado. Tente outro método.';
+
+    if (result['outcome_unknown'] == true) {
+      final status = await paymentCtrl.checkStatus(orderId: widget.orderId);
+      if (!context.mounted) return;
+
+      switch (PaymentStatus.fromApi(status)) {
+        case PaymentStatus.paid:
+          cart.clear();
+          navigator.pushReplacement(
+            MaterialPageRoute(
+              builder: (_) =>
+                  PaymentResultPage(success: true, orderId: widget.orderId),
+            ),
+          );
+          return;
+        case PaymentStatus.failed:
+          break;
+        case PaymentStatus.pending:
+        case PaymentStatus.refunded:
+        case PaymentStatus.unknown:
+          setState(() {
+            _paymentPending = true;
+            _statusMessage = status == 'pending'
+                ? 'Pagamento em processamento. Aguarde a confirmação. Não pague novamente.'
+                : 'Não foi possível confirmar o resultado da cobrança. Estamos verificando; não tente pagar novamente.';
+          });
+          _startPaymentPolling();
+          return;
+      }
+    }
 
     messenger.showSnackBar(
       SnackBar(
@@ -337,93 +477,20 @@ class _PaymentPageState extends State<PaymentPage> {
 class _PaymentHero extends StatelessWidget {
   final double total;
   final int orderId;
-
   const _PaymentHero({required this.total, required this.orderId});
 
   @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(22),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(28),
-        gradient: const LinearGradient(
-          colors: [Color(0xFF183631), Color(0xFF0F8B6E)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text('Pagamento', style: Theme.of(context).textTheme.headlineSmall),
+      const SizedBox(height: 8),
+      Text(
+        'Pedido #$orderId • ${_format(total)}',
+        style: Theme.of(context).textTheme.titleMedium,
       ),
-      child: Wrap(
-        spacing: 12,
-        runSpacing: 12,
-        alignment: WrapAlignment.spaceBetween,
-        children: [
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 560),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Pedido #$orderId',
-                  style: const TextStyle(
-                    color: Colors.white70,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'Finalize o pagamento com seguranca.',
-                  style: theme.textTheme.headlineMedium?.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Pix gera QR Code imediatamente. Cartao conclui a cobranca no mesmo fluxo.',
-                  style: theme.textTheme.bodyLarge?.copyWith(
-                    color: Colors.white.withValues(alpha: 0.82),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(22),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Total a pagar',
-                  style: TextStyle(
-                    color: Colors.white70,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  _format(total),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 26,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+    ],
+  );
 }
 
 class _PaymentPanel extends StatelessWidget {
@@ -438,7 +505,7 @@ class _PaymentPanel extends StatelessWidget {
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: AppColors.surface,
-        borderRadius: BorderRadius.circular(28),
+        borderRadius: BorderRadius.circular(8),
         border: Border.all(color: AppColors.border),
         boxShadow: [
           BoxShadow(
@@ -486,7 +553,7 @@ class _PaymentSidebar extends StatelessWidget {
                 label: 'Frete',
                 value: _format(_shippingPrice(cart.selectedShipping)),
               ),
-              _SummaryRow(label: 'Metodo', value: method.name.toUpperCase()),
+              _SummaryRow(label: 'Método', value: method.name.toUpperCase()),
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 12),
                 child: Divider(height: 1, color: AppColors.border),
@@ -501,7 +568,7 @@ class _PaymentSidebar extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Seguranca',
+                'Segurança',
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w800,
@@ -511,19 +578,19 @@ class _PaymentSidebar extends StatelessWidget {
               SizedBox(height: 14),
               _SecurityItem(
                 icon: Icons.verified_user_outlined,
-                text: 'Dados sensiveis trafegam apenas na etapa de cobranca.',
+                text: 'Dados sensíveis trafegam apenas na etapa de cobrança.',
               ),
               SizedBox(height: 12),
               _SecurityItem(
                 icon: Icons.qr_code_2_outlined,
                 text:
-                    'Pix fica disponivel com copia e cola e verificacao de status.',
+                    'Pix fica disponível com copia e cola e verificação de status.',
               ),
               SizedBox(height: 12),
               _SecurityItem(
                 icon: Icons.local_shipping_outlined,
                 text:
-                    'O pedido permanece associado ao endereco e frete selecionados.',
+                    'O pedido permanece associado ao endereço e frete selecionados.',
               ),
             ],
           ),
@@ -580,13 +647,13 @@ class _CardSelectionPanel extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.background,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Cartoes salvos',
+            'Cartões para esta tentativa',
             style: TextStyle(
               fontWeight: FontWeight.w800,
               color: AppColors.textDark,
@@ -595,7 +662,7 @@ class _CardSelectionPanel extends StatelessWidget {
           const SizedBox(height: 12),
           if (cardCtrl.cards.isEmpty)
             const Text(
-              'Nenhum cartao cadastrado.',
+              'Nenhum cartão informado.',
               style: TextStyle(color: AppColors.textLight),
             )
           else
@@ -603,40 +670,49 @@ class _CardSelectionPanel extends StatelessWidget {
               final selected = cardCtrl.selected?.id == card.id;
               return Container(
                 margin: const EdgeInsets.only(bottom: 10),
-                child: InkWell(
+                child: Semantics(
+                  button: true,
+                  selected: selected,
+                  label: 'Cartão terminado em ${card.last4}',
                   onTap: () => cardCtrl.select(card),
-                  borderRadius: BorderRadius.circular(20),
-                  child: Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: selected ? AppColors.surfaceMuted : Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: selected ? AppColors.primary : AppColors.border,
-                        width: selected ? 1.4 : 1,
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          selected
-                              ? Icons.check_circle
-                              : Icons.credit_card_outlined,
+                  excludeSemantics: true,
+                  child: InkWell(
+                    onTap: () => cardCtrl.select(card),
+                    borderRadius: BorderRadius.circular(20),
+                    child: Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: selected ? AppColors.surfaceMuted : Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
                           color: selected
-                              ? AppColors.primaryDark
-                              : AppColors.primary,
+                              ? AppColors.primary
+                              : AppColors.border,
+                          width: selected ? 1.4 : 1,
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            '•••• ${card.last4}',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.textDark,
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            selected
+                                ? Icons.check_circle
+                                : Icons.credit_card_outlined,
+                            color: selected
+                                ? AppColors.primaryDark
+                                : AppColors.primary,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              '•••• ${card.last4}',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.textDark,
+                              ),
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -649,7 +725,7 @@ class _CardSelectionPanel extends StatelessWidget {
               builder: (_) => const AddCardModal(),
             ),
             icon: const Icon(Icons.add),
-            label: const Text('Adicionar cartao'),
+            label: const Text('Adicionar cartão'),
           ),
         ],
       ),
@@ -670,10 +746,10 @@ class _PixPanel extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: AppColors.background,
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(8),
         ),
         child: const Text(
-          'Ao confirmar, voce recebera um QR Code Pix com copia e cola.',
+          'Ao confirmar, você receberá um QR Code Pix com copia e cola.',
           style: TextStyle(
             color: AppColors.textDark,
             fontWeight: FontWeight.w600,
@@ -687,14 +763,16 @@ class _PixPanel extends StatelessWidget {
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: AppColors.background,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Column(
         children: [
-          QrImageView(
-            data: pixQrCode!,
-            size: 220,
-            backgroundColor: Colors.white,
+          LayoutBuilder(
+            builder: (context, constraints) => QrImageView(
+              data: pixQrCode!,
+              size: constraints.maxWidth.clamp(0, 220),
+              backgroundColor: Colors.white,
+            ),
           ),
           const SizedBox(height: 16),
           const Text(
@@ -710,7 +788,7 @@ class _PixPanel extends StatelessWidget {
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(18),
+              borderRadius: BorderRadius.circular(8),
               border: Border.all(color: AppColors.border),
             ),
             child: SelectableText(
@@ -726,16 +804,16 @@ class _PixPanel extends StatelessWidget {
                 await Clipboard.setData(ClipboardData(text: pixQrCode!));
                 if (!context.mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Codigo Pix copiado')),
+                  const SnackBar(content: Text('Código Pix copiado')),
                 );
               },
               icon: const Icon(Icons.copy_outlined),
-              label: const Text('Copiar codigo Pix'),
+              label: const Text('Copiar código Pix'),
             ),
           ),
           const SizedBox(height: 12),
           const Text(
-            'Aguardando confirmacao do pagamento...',
+            'Aguardando confirmação do pagamento...',
             style: TextStyle(color: AppColors.textLight),
           ),
         ],
@@ -760,14 +838,22 @@ class _SummaryRow extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(color: AppColors.textLight)),
-          Text(
-            value,
-            style: TextStyle(
-              fontWeight: bold ? FontWeight.w800 : FontWeight.w700,
-              color: AppColors.textDark,
+          Expanded(
+            child: Text(
+              label,
+              style: const TextStyle(color: AppColors.textLight),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Flexible(
+            child: Text(
+              value,
+              textAlign: TextAlign.right,
+              style: TextStyle(
+                fontWeight: bold ? FontWeight.w800 : FontWeight.w700,
+                color: AppColors.textDark,
+              ),
             ),
           ),
         ],
@@ -780,27 +866,35 @@ class _PaymentMethodButton extends StatelessWidget {
   final String label;
   final IconData icon;
   final bool selected;
+  final bool enabled;
   final VoidCallback onTap;
 
   const _PaymentMethodButton({
     required this.label,
     required this.icon,
     required this.selected,
+    this.enabled = true,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Expanded(
+    return Semantics(
+      button: true,
+      selected: selected,
+      enabled: enabled,
+      label: '$label, forma de pagamento',
+      onTap: enabled ? onTap : null,
+      excludeSemantics: true,
       child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(18),
+        onTap: enabled ? onTap : null,
+        borderRadius: BorderRadius.circular(8),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 180),
           height: 54,
           decoration: BoxDecoration(
             color: selected ? AppColors.surfaceMuted : AppColors.background,
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: BorderRadius.circular(8),
             border: Border.all(
               color: selected ? AppColors.primary : AppColors.border,
               width: selected ? 1.4 : 1,

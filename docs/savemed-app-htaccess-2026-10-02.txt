@@ -1,0 +1,11 @@
+<IfModule mod_mime.c>
+  AddType application/wasm .wasm
+</IfModule>
+
+<IfModule mod_headers.c>
+  <FilesMatch "^(index\.html|flutter_bootstrap\.js|main\.dart\.js|flutter_service_worker\.js|version\.json)$">
+    Header set Cache-Control "no-store, no-cache, must-revalidate, max-age=0"
+    Header set Pragma "no-cache"
+    Header set Expires "0"
+  </FilesMatch>
+</IfModule>

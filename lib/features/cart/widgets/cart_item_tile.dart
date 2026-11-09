@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import 'package:SaveMed/core/controllers/cart_controller.dart';
-import 'package:SaveMed/core/theme/app_colors.dart';
-import 'package:SaveMed/models/cart_item.dart';
+import 'package:savemed/core/controllers/cart_controller.dart';
+import 'package:savemed/core/theme/app_colors.dart';
+import 'package:savemed/models/cart_item.dart';
 
 class CartItemTile extends StatelessWidget {
   final CartItem cartItem;
@@ -34,7 +34,9 @@ class CartItemTile extends StatelessWidget {
               _QuantitySelector(
                 quantity: cartItem.quantity,
                 onDecrease: () => cart.decrease(cartItem),
-                onIncrease: () => cart.increase(cartItem),
+                onIncrease: cart.canIncrease(cartItem)
+                    ? () => cart.increase(cartItem)
+                    : null,
               ),
               const SizedBox(width: 20),
               SizedBox(
@@ -58,10 +60,7 @@ class _MobileCartItem extends StatelessWidget {
   final CartController cart;
   final CartItem cartItem;
 
-  const _MobileCartItem({
-    required this.cart,
-    required this.cartItem,
-  });
+  const _MobileCartItem({required this.cart, required this.cartItem});
 
   @override
   Widget build(BuildContext context) {
@@ -90,14 +89,19 @@ class _MobileCartItem extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 14),
-          Row(
+          Wrap(
+            spacing: 12,
+            runSpacing: 10,
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               _QuantitySelector(
                 quantity: cartItem.quantity,
                 onDecrease: () => cart.decrease(cartItem),
-                onIncrease: () => cart.increase(cartItem),
+                onIncrease: cart.canIncrease(cartItem)
+                    ? () => cart.increase(cartItem)
+                    : null,
               ),
-              const Spacer(),
               Text(
                 _format(item.price * cartItem.quantity),
                 style: const TextStyle(
@@ -135,9 +139,32 @@ class _ProductImage extends StatelessWidget {
       child: imageUrl != null
           ? ClipRRect(
               borderRadius: BorderRadius.circular(20),
-              child: Image.network(imageUrl!, fit: BoxFit.contain),
+              child: Image.network(
+                imageUrl!,
+                fit: BoxFit.contain,
+                loadingBuilder: (_, child, progress) => progress == null
+                    ? child
+                    : const Center(
+                        child: Icon(
+                          Icons.medication_outlined,
+                          color: AppColors.primary,
+                          size: 36,
+                        ),
+                      ),
+                errorBuilder: (_, __, ___) => const Center(
+                  child: Icon(
+                    Icons.medication_outlined,
+                    color: AppColors.primary,
+                    size: 36,
+                  ),
+                ),
+              ),
             )
-          : const Icon(Icons.medication_outlined, color: AppColors.primary, size: 36),
+          : const Icon(
+              Icons.medication_outlined,
+              color: AppColors.primary,
+              size: 36,
+            ),
     );
   }
 }
@@ -168,7 +195,7 @@ class _ItemInfo extends StatelessWidget {
         ),
         const SizedBox(height: 6),
         Text(
-          'Unitario ${_format(unitPrice)}',
+          'Unitário ${_format(unitPrice)}',
           style: const TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w500,
@@ -176,15 +203,16 @@ class _ItemInfo extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 10),
-        GestureDetector(
-          onTap: onRemove,
+        TextButton(
+          onPressed: onRemove,
+          style: TextButton.styleFrom(
+            minimumSize: const Size(44, 44),
+            padding: EdgeInsets.zero,
+            alignment: Alignment.centerLeft,
+          ),
           child: const Text(
             'Remover do carrinho',
-            style: TextStyle(
-              color: AppColors.primaryDark,
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-            ),
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
           ),
         ),
       ],
@@ -195,7 +223,7 @@ class _ItemInfo extends StatelessWidget {
 class _QuantitySelector extends StatelessWidget {
   final int quantity;
   final VoidCallback onDecrease;
-  final VoidCallback onIncrease;
+  final VoidCallback? onIncrease;
 
   const _QuantitySelector({
     required this.quantity,
@@ -214,7 +242,11 @@ class _QuantitySelector extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _QtyButton(icon: Icons.remove, onTap: onDecrease),
+          _QtyButton(
+            icon: Icons.remove,
+            tooltip: 'Diminuir quantidade',
+            onTap: onDecrease,
+          ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12),
             child: Text(
@@ -225,7 +257,13 @@ class _QuantitySelector extends StatelessWidget {
               ),
             ),
           ),
-          _QtyButton(icon: Icons.add, onTap: onIncrease),
+          _QtyButton(
+            icon: Icons.add,
+            tooltip: onIncrease == null
+                ? 'Limite do estoque disponível'
+                : 'Aumentar quantidade',
+            onTap: onIncrease,
+          ),
         ],
       ),
     );
@@ -234,23 +272,26 @@ class _QuantitySelector extends StatelessWidget {
 
 class _QtyButton extends StatelessWidget {
   final IconData icon;
-  final VoidCallback onTap;
+  final String tooltip;
+  final VoidCallback? onTap;
 
-  const _QtyButton({required this.icon, required this.onTap});
+  const _QtyButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(999),
-      child: Container(
-        width: 36,
-        height: 36,
-        decoration: const BoxDecoration(
-          shape: BoxShape.circle,
-          color: AppColors.surfaceMuted,
-        ),
-        child: Icon(icon, size: 18, color: AppColors.primaryDark),
+    return IconButton.filledTonal(
+      onPressed: onTap,
+      tooltip: tooltip,
+      icon: Icon(icon, size: 18),
+      constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+      padding: EdgeInsets.zero,
+      style: IconButton.styleFrom(
+        backgroundColor: AppColors.surfaceMuted,
+        foregroundColor: AppColors.primaryDark,
       ),
     );
   }

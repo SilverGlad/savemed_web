@@ -26,13 +26,14 @@ class SaveMedButton extends StatelessWidget {
 
     final backgroundColor = outlined
         ? Colors.transparent
-        : (isDisabled ? AppColors.primary.withValues(alpha: 0.45) : AppColors.primary);
+        : (isDisabled
+              ? AppColors.primary.withValues(alpha: 0.45)
+              : AppColors.primary);
 
     final foregroundColor = outlined ? AppColors.primary : Colors.white;
 
-    return SizedBox(
-      width: double.infinity,
-      height: height,
+    return ConstrainedBox(
+      constraints: BoxConstraints(minWidth: double.infinity, minHeight: height),
       child: ElevatedButton(
         onPressed: isDisabled ? null : onPressed,
         style: ElevatedButton.styleFrom(
@@ -42,7 +43,7 @@ class SaveMedButton extends StatelessWidget {
           foregroundColor: foregroundColor,
           padding: const EdgeInsets.symmetric(horizontal: 18),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: BorderRadius.circular(8),
             side: outlined
                 ? const BorderSide(color: AppColors.primary)
                 : BorderSide.none,
@@ -59,13 +60,13 @@ class SaveMedButton extends StatelessWidget {
                 ),
               )
             : icon == null
-            ? Text(label)
+            ? Text(label, textAlign: TextAlign.center)
             : Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(icon, size: 18),
                   const SizedBox(width: 8),
-                  Text(label),
+                  Flexible(child: Text(label, textAlign: TextAlign.center)),
                 ],
               ),
       ),

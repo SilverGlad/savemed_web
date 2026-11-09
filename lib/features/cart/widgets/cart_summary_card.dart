@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import 'package:SaveMed/core/controllers/address_controller.dart';
-import 'package:SaveMed/core/controllers/cart_controller.dart';
-import 'package:SaveMed/core/controllers/pharmacy_controller.dart';
-import 'package:SaveMed/core/theme/app_colors.dart';
-import 'package:SaveMed/core/widgets/address_modal.dart';
-import 'package:SaveMed/core/widgets/savemed_button.dart';
-import 'package:SaveMed/features/checkout/checkout_page.dart';
+import 'package:savemed/core/controllers/address_controller.dart';
+import 'package:savemed/core/controllers/auth_controller.dart';
+import 'package:savemed/core/controllers/cart_controller.dart';
+import 'package:savemed/core/controllers/pharmacy_controller.dart';
+import 'package:savemed/core/theme/app_colors.dart';
+import 'package:savemed/core/widgets/address_modal.dart';
+import 'package:savemed/core/widgets/address_load_notice.dart';
+import 'package:savemed/core/widgets/savemed_button.dart';
+import 'package:savemed/features/checkout/checkout_page.dart';
 
 class CartSummaryCard extends StatefulWidget {
   const CartSummaryCard({super.key});
@@ -18,7 +20,7 @@ class CartSummaryCard extends StatefulWidget {
 
 class _CartSummaryCardState extends State<CartSummaryCard> {
   int? _lastPharmacyId;
-  String? _lastCalculatedCep;
+  Object? _lastShippingInput;
 
   @override
   void didChangeDependencies() {
@@ -28,19 +30,24 @@ class _CartSummaryCardState extends State<CartSummaryCard> {
     final pharmacyCtrl = context.read<PharmacyController>();
 
     if (cart.pharmacyId != null && cart.pharmacyId != _lastPharmacyId) {
-      _lastPharmacyId = cart.pharmacyId;
-      pharmacyCtrl.loadAddress(cart.pharmacyId!);
-      cart.clearAddress();
-      _lastCalculatedCep = null;
+      final pharmacyId = cart.pharmacyId!;
+      _lastPharmacyId = pharmacyId;
+      _lastShippingInput = null;
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || cart.pharmacyId != pharmacyId) return;
+        pharmacyCtrl.loadAddress(pharmacyId);
+      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final pharmacyCep = context.select<PharmacyController, String?>(
-      (ctrl) => ctrl.pharmacyAddress?['CEP'],
-    );
+    final pharmacyCtrl = context.watch<PharmacyController>();
     final cart = context.watch<CartController>();
+    final pharmacyCep = pharmacyCtrl.addressPharmacyId == cart.pharmacyId
+        ? pharmacyCtrl.pharmacyAddress?.cep
+        : null;
 
     _maybeCalculateShipping(pharmacyCep, cart);
 
@@ -91,7 +98,7 @@ class _CartSummaryCardState extends State<CartSummaryCard> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  cart.pharmacyName ?? 'Selecione itens de uma farmacia',
+                  cart.pharmacyName ?? 'Selecione itens de uma farmácia',
                   style: const TextStyle(
                     color: Colors.white70,
                     fontSize: 13,
@@ -124,8 +131,23 @@ class _CartSummaryCardState extends State<CartSummaryCard> {
             ),
           ),
           const SizedBox(height: 18),
+          if (pharmacyCtrl.addressPharmacyId == cart.pharmacyId &&
+              pharmacyCtrl.addressError != null) ...[
+            Semantics(
+              liveRegion: true,
+              child: const Text(
+                'Não foi possível carregar o endereço da farmácia para calcular a entrega.',
+              ),
+            ),
+            TextButton.icon(
+              onPressed: () => pharmacyCtrl.loadAddress(cart.pharmacyId!),
+              icon: const Icon(Icons.refresh),
+              label: const Text('Tentar carregar a farmácia novamente'),
+            ),
+            const SizedBox(height: 12),
+          ],
           _SectionTitle(
-            title: 'Endereco de entrega',
+            title: 'Endereço de entrega',
             action: TextButton.icon(
               onPressed: () {
                 showDialog(
@@ -137,24 +159,36 @@ class _CartSummaryCardState extends State<CartSummaryCard> {
               label: const Text('Novo'),
             ),
           ),
-          if (addressCtrl.addresses.isEmpty)
+          if (addressCtrl.loading)
+            const LinearProgressIndicator(
+              semanticsLabel: 'Carregando endereços',
+            )
+          else if (addressCtrl.error != null)
+            AddressLoadNotice(
+              onRetry: context.watch<AuthController>().user == null
+                  ? null
+                  : () {
+                      final userId = context.read<AuthController>().user?.id;
+                      if (userId != null) addressCtrl.reloadForUi(userId);
+                    },
+            )
+          else if (addressCtrl.addresses.isEmpty)
             const _MessageCard(
               icon: Icons.location_off_outlined,
-              message: 'Cadastre um endereco para liberar o frete.',
+              message: 'Cadastre um endereço para liberar o frete.',
             )
           else
             Column(
               children: addressCtrl.addresses.map<Widget>((address) {
-                final selected = cart.selectedAddress?['ID'] == address['ID'];
+                final selected = cart.selectedAddress?.id == address.id;
                 return _SelectableCard(
                   selected: selected,
                   icon: Icons.location_on_outlined,
-                  title: '${address['STREET']}, ${address['NUMBER'] ?? 's/n'}',
+                  title: '${address.street}, ${address.number ?? 's/n'}',
                   subtitle:
-                      '${address['CITY']} - ${address['STATE']} | CEP ${address['CEP']}',
+                      '${address.city} - ${address.state} | CEP ${address.cep}',
                   onTap: () {
                     cart.selectAddress(address);
-                    _lastCalculatedCep = null;
                   },
                 );
               }).toList(),
@@ -207,15 +241,23 @@ class _CartSummaryCardState extends State<CartSummaryCard> {
       return;
     }
 
-    final userCep = cart.selectedAddress!['CEP'];
-    if (userCep == null || _lastCalculatedCep == userCep) {
+    final userCep = cart.selectedAddress!.cep;
+    final input = (cart.pharmacyId, cart.shippingInputRevision, pharmacyCep);
+    if (userCep.isEmpty || _lastShippingInput == input) {
       return;
     }
 
-    _lastCalculatedCep = userCep;
+    _lastShippingInput = input;
+    final pharmacyId = cart.pharmacyId;
+    final revision = cart.shippingInputRevision;
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
+      if (!mounted ||
+          cart.pharmacyId != pharmacyId ||
+          cart.shippingInputRevision != revision ||
+          cart.selectedAddress?.cep != userCep) {
+        return;
+      }
       cart.calculateShipping(pharmacyCep);
     });
   }
@@ -251,7 +293,7 @@ class _ShippingSectionState extends State<_ShippingSection> {
       return const Padding(
         padding: EdgeInsets.only(top: 6),
         child: Text(
-          'Selecione um endereco para calcular o frete.',
+          'Selecione um endereço para calcular o frete.',
           style: TextStyle(color: AppColors.textLight, fontSize: 13),
         ),
       );
@@ -291,7 +333,7 @@ class _ShippingSectionState extends State<_ShippingSection> {
       return const Padding(
         padding: EdgeInsets.only(top: 6),
         child: Text(
-          'Nenhuma opcao de entrega disponivel para este endereco.',
+          'Nenhuma opção de entrega disponível para este endereço.',
           style: TextStyle(color: AppColors.textLight, fontSize: 13),
         ),
       );
@@ -333,8 +375,8 @@ class _ShippingSectionState extends State<_ShippingSection> {
             icon: Icons.local_shipping_outlined,
             title: 'Entrega Melhor Envio',
             subtitle: _showMelhorEnvioOptions
-                ? 'Escolha uma das opcoes abaixo.'
-                : '${melhorEnvioOptions.length} opcoes disponiveis a partir de ${_format(_lowestPrice(melhorEnvioOptions))}.',
+                ? 'Escolha uma das opções abaixo.'
+                : '${melhorEnvioOptions.length} opções disponíveis a partir de ${_format(_lowestPrice(melhorEnvioOptions))}.',
             trailing: Icon(
               _showMelhorEnvioOptions
                   ? Icons.expand_less_rounded
@@ -381,7 +423,11 @@ class _SectionTitle extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
-      child: Row(
+      child: Wrap(
+        spacing: 12,
+        runSpacing: 4,
+        alignment: WrapAlignment.spaceBetween,
+        crossAxisAlignment: WrapCrossAlignment.center,
         children: [
           Text(
             title,
@@ -391,7 +437,6 @@ class _SectionTitle extends StatelessWidget {
               color: AppColors.textDark,
             ),
           ),
-          const Spacer(),
           if (action != null) action!,
         ],
       ),
@@ -418,63 +463,71 @@ class _SelectableCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: title,
+      value: subtitle,
       onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: selected ? AppColors.surfaceMuted : AppColors.background,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: selected ? AppColors.primary : AppColors.border,
-            width: selected ? 1.4 : 1,
+      excludeSemantics: true,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 10),
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: selected ? AppColors.surfaceMuted : AppColors.background,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: selected ? AppColors.primary : AppColors.border,
+              width: selected ? 1.4 : 1,
+            ),
           ),
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: 38,
-              height: 38,
-              decoration: BoxDecoration(
-                color: selected
-                    ? AppColors.primary.withValues(alpha: 0.12)
-                    : Colors.white,
-                shape: BoxShape.circle,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: selected
+                      ? AppColors.primary.withValues(alpha: 0.12)
+                      : Colors.white,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  selected ? Icons.check_circle : icon,
+                  size: 20,
+                  color: selected ? AppColors.primaryDark : AppColors.primary,
+                ),
               ),
-              child: Icon(
-                selected ? Icons.check_circle : icon,
-                size: 20,
-                color: selected ? AppColors.primaryDark : AppColors.primary,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textDark,
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textDark,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    subtitle,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: AppColors.textLight,
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textLight,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-            if (trailing != null) ...[const SizedBox(width: 10), trailing!],
-          ],
+              if (trailing != null) ...[const SizedBox(width: 10), trailing!],
+            ],
+          ),
         ),
       ),
     );
@@ -535,10 +588,14 @@ class _ValueRow extends StatelessWidget {
     );
 
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label, style: style.copyWith(color: AppColors.textLight)),
-        Text(value, style: style),
+        Expanded(
+          child: Text(label, style: style.copyWith(color: AppColors.textLight)),
+        ),
+        const SizedBox(width: 12),
+        Flexible(
+          child: Text(value, textAlign: TextAlign.right, style: style),
+        ),
       ],
     );
   }
@@ -580,12 +637,12 @@ String _shippingTitle(Map<String, dynamic> option) {
 
 String _shippingSubtitle(Map<String, dynamic> option) {
   if (option['method'] == 'pickup') {
-    return option['description']?.toString() ?? 'Retirada na farmacia.';
+    return option['description']?.toString() ?? 'Retirada na farmácia.';
   }
 
   if (option['method'] == 'own_delivery') {
     return option['description']?.toString() ??
-        'Entrega realizada pela farmacia.';
+        'Entrega realizada pela farmácia.';
   }
 
   final deliveryTime = option['delivery_time']?.toString();

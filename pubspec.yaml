@@ -1,4 +1,4 @@
-name: SaveMed
+name: savemed
 description: "A new Flutter project."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.0.3+6
+version: 1.1.0+7
 
 environment:
   sdk: ^3.8.1
@@ -42,6 +42,13 @@ dependencies:
   mask_text_input_formatter: ^2.9.0
   uuid: ^4.5.2
   qr_flutter: ^4.1.0
+  file_picker: 8.1.7
+  flutter_secure_storage: ^10.2.0
+  url_launcher: 6.3.2
+
+dependency_overrides:
+  # Newer releases upgrade AndroidX beyond the app's current Android Gradle Plugin.
+  url_launcher_android: 6.3.25
 
 dev_dependencies:
   flutter_test:
@@ -78,6 +85,13 @@ flutter:
     - assets/banners/banner2.jpg
     - assets/banners/banner3.jpg
     - assets/banners/banner4.jpg
+    - assets/images/editorial/paracetamol_front.jpeg
+    - assets/images/editorial/paracetamol_back.jpeg
+    - assets/images/editorial/delivery.jpeg
+    - assets/images/editorial/family.jpeg
+    - assets/images/editorial/maternity.jpeg
+    - assets/images/editorial/exercise.jpeg
+    - assets/images/editorial/senior.jpeg
 
   fonts:
     - family: Montserrat

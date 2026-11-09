@@ -1,11 +1,11 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:SaveMed/features/product_list/product_list_page.dart';
+import 'package:savemed/features/product_list/product_list_page.dart';
 
 import '../controllers/category_controller.dart';
 import '../theme/app_colors.dart';
-import '../utils/category_assets.dart';
+import '../utils/category_icons.dart';
 
 class CategorySection extends StatefulWidget {
   const CategorySection({super.key});
@@ -42,17 +42,12 @@ class _CategorySectionState extends State<CategorySection> {
 
     return Container(
       margin: EdgeInsets.fromLTRB(
-        isMobile ? 12 : 64,
+        isMobile ? 12 : 24,
         0,
-        isMobile ? 12 : 64,
+        isMobile ? 12 : 24,
         18,
       ),
-      padding: EdgeInsets.all(isMobile ? 18 : 64),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: AppColors.border),
-      ),
+      padding: const EdgeInsets.symmetric(vertical: 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -60,14 +55,9 @@ class _CategorySectionState extends State<CategorySection> {
             'Explore por categoria',
             style: Theme.of(context).textTheme.titleLarge,
           ),
-          const SizedBox(height: 6),
-          const Text(
-            'Navegacao mais rapida para os itens que voce compra com frequencia.',
-            style: TextStyle(color: AppColors.textLight),
-          ),
           const SizedBox(height: 18),
           SizedBox(
-            height: isMobile ? 116 : 136,
+            height: 148 + (MediaQuery.textScalerOf(context).scale(1) - 1) * 76,
             child: ScrollConfiguration(
               behavior: _MouseDragScrollBehavior(),
               child: ListView.separated(
@@ -79,6 +69,7 @@ class _CategorySectionState extends State<CategorySection> {
                   final category = controller.categories[index];
                   return _CategoryCard(
                     categoryName: category.name,
+                    imageUrl: category.image,
                     onTap: () {
                       Navigator.push(
                         context,
@@ -101,8 +92,13 @@ class _CategorySectionState extends State<CategorySection> {
 class _CategoryCard extends StatefulWidget {
   final String categoryName;
   final VoidCallback onTap;
+  final String? imageUrl;
 
-  const _CategoryCard({required this.categoryName, required this.onTap});
+  const _CategoryCard({
+    required this.categoryName,
+    required this.onTap,
+    this.imageUrl,
+  });
 
   @override
   State<_CategoryCard> createState() => _CategoryCardState();
@@ -113,8 +109,6 @@ class _CategoryCardState extends State<_CategoryCard> {
 
   @override
   Widget build(BuildContext context) {
-    final isMobile = MediaQuery.of(context).size.width <= 700;
-
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       onEnter: (_) => setState(() => _hovered = true),
@@ -122,38 +116,53 @@ class _CategoryCardState extends State<_CategoryCard> {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
         curve: Curves.easeOut,
-        transform: _hovered
-            ? (Matrix4.identity()..translateByDouble(0, -3, 0, 1))
-            : Matrix4.identity(),
         child: InkWell(
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(8),
           onTap: widget.onTap,
           child: Container(
-            width: isMobile ? 102 : 128,
+            width:
+                156 * MediaQuery.textScalerOf(context).scale(1).clamp(1, 1.5),
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [AppColors.surfaceMuted, Colors.white],
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: _hovered ? AppColors.primary : AppColors.border,
               ),
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: AppColors.border),
             ),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Expanded(
-                  child: Image.asset(
-                    categoryAssetByName(widget.categoryName),
-                    fit: BoxFit.contain,
-                  ),
+                  child: widget.imageUrl == null
+                      ? Icon(
+                          categoryIconByName(widget.categoryName),
+                          size: 40,
+                          color: AppColors.primary,
+                        )
+                      : Image.network(
+                          widget.imageUrl!,
+                          fit: BoxFit.contain,
+                          loadingBuilder: (_, child, progress) =>
+                              progress == null
+                              ? child
+                              : Icon(
+                                  categoryIconByName(widget.categoryName),
+                                  size: 40,
+                                  color: AppColors.primary,
+                                ),
+                          errorBuilder: (_, __, ___) => Icon(
+                            categoryIconByName(widget.categoryName),
+                            size: 40,
+                            color: AppColors.primary,
+                          ),
+                        ),
                 ),
                 const SizedBox(height: 8),
                 Text(
                   widget.categoryName,
                   textAlign: TextAlign.center,
-                  maxLines: 2,
+                  maxLines: 3,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     fontSize: 12,

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../models/inventory_item.dart';
 import '../services/inventory_service.dart';
+import '../logging/app_logger.dart';
 
 enum InventoryOrder { relevance, priceAsc, priceDesc, nameAsc }
 
@@ -14,6 +15,7 @@ class InventoryController extends ChangeNotifier {
   // ESTADO
   // ======================
   bool loading = false;
+  Object? error;
 
   List<InventoryItem> allItems = [];
   List<InventoryItem> items = [];
@@ -34,13 +36,15 @@ class InventoryController extends ChangeNotifier {
   // ======================
   Future<void> load() async {
     loading = true;
+    error = null;
     notifyListeners();
 
     try {
       allItems = await inventoryService.getInventory();
       _applyFilters();
-    } catch (e) {
-      debugPrint('Erro ao carregar inventário: $e');
+    } catch (loadError) {
+      error = loadError;
+      AppLogger.event(AppLogEvent.inventoryLoadFailed);
     }
 
     loading = false;

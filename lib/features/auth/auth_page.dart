@@ -1,22 +1,31 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:http/http.dart' as http;
+import 'package:mask_text_input_formatter/mask_text_input_formatter.dart';
 import 'package:provider/provider.dart';
-import 'package:SaveMed/core/controllers/address_controller.dart';
-import 'package:SaveMed/core/controllers/auth_controller.dart';
-import 'package:SaveMed/core/services/auth_service.dart';
-import 'package:SaveMed/core/theme/app_colors.dart';
-import 'package:SaveMed/core/utils/document_validator.dart';
-import 'package:SaveMed/core/utils/input_formatters.dart';
-import 'package:SaveMed/core/widgets/savemed_button.dart';
-import 'package:SaveMed/core/widgets/savemed_footer.dart';
-import 'package:SaveMed/features/admin/admin_page.dart';
-import 'package:SaveMed/features/home/home_page.dart';
+import 'package:savemed/core/api/api_error_message.dart';
+import 'package:savemed/core/api/api_response.dart';
+import 'package:savemed/core/controllers/address_controller.dart';
+import 'package:savemed/core/controllers/auth_controller.dart';
+import 'package:savemed/core/services/auth_service.dart';
+import 'package:savemed/core/services/cep_lookup_service.dart';
+import 'package:savemed/core/theme/app_colors.dart';
+import 'package:savemed/core/utils/document_validator.dart';
+import 'package:savemed/core/utils/field_validators.dart';
+import 'package:savemed/core/utils/input_formatters.dart';
+import 'package:savemed/core/widgets/savemed_button.dart';
+import 'package:savemed/core/widgets/password_requirements.dart';
+import 'package:savemed/core/widgets/savemed_footer.dart';
+import 'package:savemed/core/widgets/savemed_logo.dart';
+import 'package:savemed/features/auth/registration_error_mapper.dart';
+import 'package:savemed/features/admin/admin_page.dart';
+import 'package:savemed/features/home/home_page.dart';
+import 'package:savemed/models/pharmacy_access_request.dart';
+import 'package:savemed/models/pharmacy_search_result.dart';
 
 class AuthPage extends StatefulWidget {
-  const AuthPage({super.key});
+  final AuthService authService;
+
+  const AuthPage({super.key, this.authService = const AuthService()});
 
   @override
   State<AuthPage> createState() => _AuthPageState();
@@ -24,158 +33,61 @@ class AuthPage extends StatefulWidget {
 
 class _AuthPageState extends State<AuthPage> {
   bool isLogin = true;
+  String loginEmailPrefill = '';
 
   @override
   Widget build(BuildContext context) {
-    final width = MediaQuery.of(context).size.width;
-    final isMobile = width <= 600;
-    final isDesktop = width >= 980;
-
+    final isMobile = MediaQuery.sizeOf(context).width < 600;
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: Column(
-        children: [
-          const _AuthHeader(),
-          SizedBox(height: isMobile ? 12 : 20),
-          Expanded(
-            child: SingleChildScrollView(
-              padding: EdgeInsets.fromLTRB(
-                isMobile ? 16 : 24,
-                0,
-                isMobile ? 16 : 24,
-                24,
-              ),
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 1180),
-                  child: Column(
-                    children: [
-                      Container(
-                        padding: EdgeInsets.all(isMobile ? 18 : 28),
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [Color(0xFFF8FFFD), Color(0xFFE2F2EE)],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          borderRadius: BorderRadius.circular(30),
-                          border: Border.all(color: AppColors.border),
-                        ),
-                        child: isMobile
-                            ? _authHero()
-                            : Row(
-                                crossAxisAlignment: CrossAxisAlignment.center,
-                                children: [
-                                  Expanded(
-                                    flex: isDesktop ? 5 : 1,
-                                    child: _authHero(),
-                                  ),
-                                  SizedBox(width: isDesktop ? 40 : 24),
-                                  Expanded(
-                                    flex: 4,
-                                    child: AnimatedSwitcher(
-                                      duration: const Duration(
-                                        milliseconds: 250,
-                                      ),
-                                      child: isLogin
-                                          ? LoginCard(
-                                              key: const ValueKey('login'),
-                                              onSwitch: () => setState(
-                                                () => isLogin = false,
-                                              ),
-                                              isMobile: isMobile,
-                                            )
-                                          : RegisterCard(
-                                              key: const ValueKey('register'),
-                                              onSwitch: () => setState(
-                                                () => isLogin = true,
-                                              ),
-                                              isMobile: isMobile,
-                                            ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                      ),
-                      if (isMobile) ...[
-                        const SizedBox(height: 18),
+      body: AutofillGroup(
+        child: Column(
+          children: [
+            const _AuthHeader(),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 560),
+                    child: Column(
+                      children: [
                         AnimatedSwitcher(
                           duration: const Duration(milliseconds: 250),
                           child: isLogin
                               ? LoginCard(
                                   key: const ValueKey('login'),
-                                  onSwitch: () =>
-                                      setState(() => isLogin = false),
+                                  authService: widget.authService,
+                                  initialEmail: loginEmailPrefill,
+                                  onSwitch: () => setState(() {
+                                    loginEmailPrefill = '';
+                                    isLogin = false;
+                                  }),
                                   isMobile: isMobile,
                                 )
                               : RegisterCard(
                                   key: const ValueKey('register'),
+                                  authService: widget.authService,
                                   onSwitch: () =>
                                       setState(() => isLogin = true),
+                                  onSwitchToLogin: (email) => setState(() {
+                                    loginEmailPrefill = email;
+                                    isLogin = true;
+                                  }),
                                   isMobile: isMobile,
                                 ),
                         ),
+                        const SizedBox(height: 24),
+                        const SaveMedFooter(),
                       ],
-                      SizedBox(height: isMobile ? 24 : 32),
-                      const SaveMedFooter(),
-                    ],
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _authHero() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(
-            color: AppColors.primary.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(999),
-          ),
-          child: const Text(
-            'Acesso seguro',
-            style: TextStyle(
-              color: AppColors.primaryDark,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ),
-        const SizedBox(height: 14),
-        const Text(
-          'Compre medicamentos com rapidez, acompanhe seus pedidos e resolva tudo em um so lugar.',
-          style: TextStyle(
-            fontSize: 30,
-            height: 1.05,
-            fontWeight: FontWeight.w700,
-            color: AppColors.textDark,
-          ),
-        ),
-        const SizedBox(height: 10),
-        const Text(
-          'Acesse sua conta para continuar a compra, consultar entregas e aproveitar uma experiencia simples tanto no celular quanto no computador.',
-          style: TextStyle(color: AppColors.textLight, height: 1.5),
-        ),
-        const SizedBox(height: 22),
-        Wrap(
-          spacing: 12,
-          runSpacing: 12,
-          children: const [
-            _HeroInfo(icon: Icons.receipt_long_outlined, label: 'Pedidos'),
-            _HeroInfo(icon: Icons.local_shipping_outlined, label: 'Entrega'),
-            _HeroInfo(
-              icon: Icons.admin_panel_settings_outlined,
-              label: 'Administracao',
-            ),
           ],
         ),
-      ],
+      ),
     );
   }
 }
@@ -202,7 +114,7 @@ class _AuthHeader extends StatelessWidget {
         ),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(28),
+          borderRadius: BorderRadius.circular(8),
           border: Border.all(color: AppColors.border),
           boxShadow: [
             BoxShadow(
@@ -218,14 +130,16 @@ class _AuthHeader extends StatelessWidget {
               width: 44,
               height: 44,
               decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [AppColors.primary, AppColors.primaryDark],
-                ),
-                borderRadius: BorderRadius.circular(14),
+                color: AppColors.greenTint,
+                border: Border.all(color: AppColors.border),
+                borderRadius: BorderRadius.circular(999),
               ),
               child: Padding(
-                padding: const EdgeInsets.all(8),
-                child: Image.asset('assets/images/logo.png'),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 5,
+                ),
+                child: const SaveMedLogoMark(width: 20, height: 34),
               ),
             ),
             const SizedBox(width: 12),
@@ -243,7 +157,7 @@ class _AuthHeader extends StatelessWidget {
                   ),
                   SizedBox(height: 2),
                   Text(
-                    'Login obrigatorio',
+                    'Sua conta',
                     style: TextStyle(
                       fontSize: 12,
                       color: AppColors.textLight,
@@ -255,42 +169,6 @@ class _AuthHeader extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _HeroInfo extends StatelessWidget {
-  final IconData icon;
-  final String label;
-
-  const _HeroInfo({required this.icon, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 18, color: AppColors.primaryDark),
-          const SizedBox(width: 8),
-          Flexible(
-            child: Text(
-              label,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontWeight: FontWeight.w700,
-                color: AppColors.textDark,
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -317,7 +195,7 @@ class AuthBaseCard extends StatelessWidget {
       padding: EdgeInsets.all(isMobile ? 20 : 32),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(28),
+        borderRadius: BorderRadius.circular(8),
         border: Border.all(color: AppColors.border),
         boxShadow: [
           BoxShadow(
@@ -342,7 +220,10 @@ class AuthBaseCard extends StatelessWidget {
             style: const TextStyle(color: AppColors.textLight),
           ),
           SizedBox(height: isMobile ? 24 : 32),
-          child,
+          FocusTraversalGroup(
+            policy: ReadingOrderTraversalPolicy(),
+            child: child,
+          ),
         ],
       ),
     );
@@ -351,18 +232,34 @@ class AuthBaseCard extends StatelessWidget {
 
 class LoginCard extends StatefulWidget {
   final VoidCallback onSwitch;
+  final String initialEmail;
   final bool isMobile;
+  final AuthService authService;
 
-  const LoginCard({super.key, required this.onSwitch, required this.isMobile});
+  const LoginCard({
+    super.key,
+    required this.onSwitch,
+    this.initialEmail = '',
+    required this.isMobile,
+    required this.authService,
+  });
 
   @override
   State<LoginCard> createState() => _LoginCardState();
 }
 
 class _LoginCardState extends State<LoginCard> {
+  final _formKey = GlobalKey<FormState>();
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
   bool _isSubmitting = false;
+  bool _showPassword = false;
+
+  @override
+  void initState() {
+    super.initState();
+    emailController.text = widget.initialEmail;
+  }
 
   @override
   void dispose() {
@@ -375,51 +272,78 @@ class _LoginCardState extends State<LoginCard> {
   Widget build(BuildContext context) {
     return AuthBaseCard(
       title: 'Bem-vindo de volta',
-      subtitle: _isSubmitting ? 'Entrando na sua conta...' : 'Novo por aqui?',
+      subtitle: _isSubmitting
+          ? 'Entrando na sua conta...'
+          : 'Acesse seus pedidos e continue sua compra.',
       isMobile: widget.isMobile,
-      child: Column(
-        children: [
-          _Input(
-            label: 'Email',
-            hint: 'Seu email',
-            icon: Icons.email_outlined,
-            controller: emailController,
-            enabled: !_isSubmitting,
-          ),
-          const SizedBox(height: 16),
-          _Input(
-            label: 'Senha',
-            hint: 'Sua senha',
-            icon: Icons.lock_outline,
-            obscure: true,
-            controller: passwordController,
-            enabled: !_isSubmitting,
-          ),
-          Align(
-            alignment: Alignment.centerRight,
-            child: TextButton(
-              onPressed: _isSubmitting
+      child: Form(
+        key: _formKey,
+        child: Column(
+          children: [
+            _Input(
+              label: 'Email',
+              hint: 'Seu e-mail',
+              icon: Icons.email_outlined,
+              controller: emailController,
+              enabled: !_isSubmitting,
+              keyboardType: TextInputType.emailAddress,
+              autofillHints: const [AutofillHints.email],
+              textInputAction: TextInputAction.next,
+              validator: (value) => isValidEmail(value ?? '')
                   ? null
-                  : () => _openForgotPasswordDialog(),
-              child: const Text('Esqueci minha senha'),
+                  : 'Informe um e-mail válido.',
             ),
-          ),
-          const SizedBox(height: 20),
-          SizedBox(
-            width: double.infinity,
-            height: 48,
-            child: SaveMedButton(
-              loading: _isSubmitting,
-              onPressed: _isSubmitting ? null : () => _handleLogin(context),
-              label: 'Entrar',
+            const SizedBox(height: 16),
+            _Input(
+              label: 'Senha',
+              hint: 'Sua senha',
+              icon: Icons.lock_outline,
+              obscure: !_showPassword,
+              controller: passwordController,
+              autofillHints: const [AutofillHints.password],
+              textInputAction: TextInputAction.done,
+              onFieldSubmitted: (_) => _handleLogin(context),
+              enabled: !_isSubmitting,
+              validator: (value) =>
+                  (value ?? '').isEmpty ? 'Informe sua senha.' : null,
+              suffix: IconButton(
+                tooltip: _showPassword
+                    ? 'Ocultar senha do login'
+                    : 'Mostrar senha do login',
+                onPressed: _isSubmitting
+                    ? null
+                    : () => setState(() => _showPassword = !_showPassword),
+                icon: Icon(
+                  _showPassword ? Icons.visibility_off : Icons.visibility,
+                ),
+              ),
             ),
-          ),
-          const SizedBox(height: 16),
-          TextButton(
-            onPressed: _isSubmitting ? null : widget.onSwitch,
-            child: const Text('Criar conta'),
-          ),
-        ],
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                onPressed: _isSubmitting
+                    ? null
+                    : () => _openForgotPasswordDialog(),
+                child: const Text('Esqueci minha senha'),
+              ),
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: SaveMedButton(
+                loading: _isSubmitting,
+                onPressed: _isSubmitting ? null : () => _handleLogin(context),
+                label: 'Entrar',
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextButton(
+              onPressed: _isSubmitting ? null : widget.onSwitch,
+              child: const Text('Criar conta'),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -430,6 +354,7 @@ class _LoginCardState extends State<LoginCard> {
     final authController = context.read<AuthController>();
     final addressController = context.read<AddressController>();
 
+    if (!(_formKey.currentState?.validate() ?? false)) return;
     FocusScope.of(context).unfocus();
     setState(() => _isSubmitting = true);
 
@@ -441,12 +366,10 @@ class _LoginCardState extends State<LoginCard> {
       );
 
       if (!mounted) return;
-      final role = authController.user?['USER_ROLE'];
       navigator.pushReplacement(
         MaterialPageRoute(
-          builder: (_) => role == 'app_admin' || role == 'pharmacy_admin'
-              ? const AdminPage()
-              : const HomePage(),
+          builder: (_) =>
+              authController.isAdmin ? const AdminPage() : const HomePage(),
         ),
       );
     } catch (e) {
@@ -470,7 +393,7 @@ class _LoginCardState extends State<LoginCard> {
             backgroundColor: AppColors.danger,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(8),
             ),
           ),
         );
@@ -484,39 +407,46 @@ class _LoginCardState extends State<LoginCard> {
   Future<void> _openForgotPasswordDialog() async {
     await showDialog<void>(
       context: context,
-      builder: (_) => _ForgotPasswordDialog(initialEmail: emailController.text),
+      builder: (_) => _ForgotPasswordDialog(
+        initialEmail: emailController.text,
+        service: widget.authService,
+      ),
     );
   }
 
   String _mapLoginError(Object error) {
-    final message = error.toString().toLowerCase();
-
-    if (message.contains('invalid') ||
-        message.contains('credenciais') ||
-        message.contains('senha') ||
-        message.contains('unauthorized')) {
-      return 'Email ou senha incorretos. Confira seus dados e tente novamente.';
+    if (error is ApiResponseException &&
+        error.code == 'PASSWORD_SETUP_REQUIRED') {
+      return 'Seu convite está pendente. Use Recuperar minha senha e informe o código recebido por e-mail.';
     }
-
-    if (message.contains('network') || message.contains('socket')) {
-      return 'Nao foi possivel conectar agora. Verifique sua internet e tente novamente.';
-    }
-
-    return 'Nao foi possivel entrar agora. Tente novamente em instantes.';
+    return ApiErrorMessage.forUser(
+      error,
+      fallback: 'Não foi possível entrar agora. Tente novamente em instantes.',
+      statusMessages: const {
+        401: 'Email ou senha incorretos. Confira os dados e tente novamente.',
+        403: 'Esta conta está inativa. Procure o administrador responsável.',
+        404: 'Email ou senha incorretos. Confira os dados e tente novamente.',
+      },
+      allowValidationMessage: false,
+    );
   }
 }
 
 class _ForgotPasswordDialog extends StatefulWidget {
   final String initialEmail;
+  final AuthService service;
 
-  const _ForgotPasswordDialog({required this.initialEmail});
+  const _ForgotPasswordDialog({
+    required this.initialEmail,
+    required this.service,
+  });
 
   @override
   State<_ForgotPasswordDialog> createState() => _ForgotPasswordDialogState();
 }
 
 class _ForgotPasswordDialogState extends State<_ForgotPasswordDialog> {
-  final _service = AuthService();
+  final _formKey = GlobalKey<FormState>();
   late final TextEditingController _emailController;
   final _codeController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -525,17 +455,24 @@ class _ForgotPasswordDialogState extends State<_ForgotPasswordDialog> {
   bool _sendingCode = false;
   bool _resettingPassword = false;
   bool _codeSent = false;
+  bool _showNewPassword = false;
+  bool _showNewPasswordConfirmation = false;
+  bool _validatingEmailOnly = false;
 
   @override
   void initState() {
     super.initState();
     _emailController = TextEditingController(text: widget.initialEmail.trim());
+    _passwordController.addListener(_refreshPasswordRequirements);
+    _confirmController.addListener(_refreshPasswordRequirements);
   }
 
   @override
   void dispose() {
     _emailController.dispose();
     _codeController.dispose();
+    _passwordController.removeListener(_refreshPasswordRequirements);
+    _confirmController.removeListener(_refreshPasswordRequirements);
     _passwordController.dispose();
     _confirmController.dispose();
     super.dispose();
@@ -544,65 +481,138 @@ class _ForgotPasswordDialogState extends State<_ForgotPasswordDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       title: const Text('Recuperar conta'),
       content: SizedBox(
         width: 420,
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                _codeSent
-                    ? 'Digite o código enviado para seu email e escolha uma nova senha.'
-                    : 'Informe seu email para receber o código de recuperação.',
-                style: const TextStyle(
-                  color: AppColors.textLight,
-                  height: 1.45,
-                ),
-              ),
-              const SizedBox(height: 18),
-              _Input(
-                label: 'Email',
-                hint: 'Seu email',
-                icon: Icons.email_outlined,
-                controller: _emailController,
-                enabled: !_sendingCode && !_resettingPassword,
-              ),
-              if (_codeSent) ...[
-                const SizedBox(height: 12),
-                _Input(
-                  label: 'Código',
-                  hint: '6 dígitos',
-                  icon: Icons.pin_outlined,
-                  controller: _codeController,
-                  enabled: !_resettingPassword,
-                  inputFormatters: [
-                    FilteringTextInputFormatter.digitsOnly,
-                    LengthLimitingTextInputFormatter(6),
+        child: AutofillGroup(
+          child: SingleChildScrollView(
+            child: Form(
+              key: _formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _codeSent
+                        ? 'Digite o código enviado para seu e-mail e escolha uma nova senha.'
+                        : 'Informe seu e-mail para receber o código de recuperação.',
+                    style: const TextStyle(
+                      color: AppColors.textLight,
+                      height: 1.45,
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  _Input(
+                    key: const ValueKey('forgot-email'),
+                    label: 'Email',
+                    hint: 'Seu e-mail',
+                    icon: Icons.email_outlined,
+                    controller: _emailController,
+                    enabled: !_codeSent && !_sendingCode && !_resettingPassword,
+                    keyboardType: TextInputType.emailAddress,
+                    autofillHints: const [AutofillHints.email],
+                    textInputAction: TextInputAction.next,
+                    validator: (value) => isValidEmail(value ?? '')
+                        ? null
+                        : 'Informe um e-mail válido.',
+                  ),
+                  if (_codeSent) ...[
+                    const SizedBox(height: 12),
+                    _Input(
+                      key: const ValueKey('forgot-code'),
+                      label: 'Código',
+                      hint: '6 dígitos',
+                      icon: Icons.pin_outlined,
+                      controller: _codeController,
+                      enabled: !_resettingPassword,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                        LengthLimitingTextInputFormatter(6),
+                      ],
+                      autofillHints: const [AutofillHints.oneTimeCode],
+                      textInputAction: TextInputAction.next,
+                      validator: (value) {
+                        if (_validatingEmailOnly) return null;
+                        return (value ?? '').trim().length == 6
+                            ? null
+                            : 'Informe o código de 6 dígitos.';
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    _Input(
+                      key: const ValueKey('forgot-password'),
+                      label: 'Nova senha',
+                      hint: 'Nova senha',
+                      icon: Icons.lock_outline,
+                      obscure: !_showNewPassword,
+                      controller: _passwordController,
+                      enabled: !_resettingPassword,
+                      autofillHints: const [AutofillHints.newPassword],
+                      textInputAction: TextInputAction.next,
+                      validator: (value) => _validatingEmailOnly
+                          ? null
+                          : validatePasswordLength(value ?? ''),
+                      suffix: IconButton(
+                        tooltip: _showNewPassword
+                            ? 'Ocultar nova senha'
+                            : 'Mostrar nova senha',
+                        onPressed: _resettingPassword
+                            ? null
+                            : () => setState(
+                                () => _showNewPassword = !_showNewPassword,
+                              ),
+                        icon: Icon(
+                          _showNewPassword
+                              ? Icons.visibility_off
+                              : Icons.visibility,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    _Input(
+                      key: const ValueKey('forgot-password-confirmation'),
+                      label: 'Confirmar nova senha',
+                      hint: 'Confirme a nova senha',
+                      icon: Icons.lock_outline,
+                      obscure: !_showNewPasswordConfirmation,
+                      controller: _confirmController,
+                      enabled: !_resettingPassword,
+                      autofillHints: const [AutofillHints.newPassword],
+                      textInputAction: TextInputAction.done,
+                      onFieldSubmitted: (_) => _handleResetPassword(),
+                      validator: (value) => _validatingEmailOnly
+                          ? null
+                          : validatePasswordConfirmation(
+                              _passwordController.text,
+                              value ?? '',
+                            ),
+                      suffix: IconButton(
+                        tooltip: _showNewPasswordConfirmation
+                            ? 'Ocultar confirmação da nova senha'
+                            : 'Mostrar confirmação da nova senha',
+                        onPressed: _resettingPassword
+                            ? null
+                            : () => setState(
+                                () => _showNewPasswordConfirmation =
+                                    !_showNewPasswordConfirmation,
+                              ),
+                        icon: Icon(
+                          _showNewPasswordConfirmation
+                              ? Icons.visibility_off
+                              : Icons.visibility,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    PasswordRequirements(
+                      password: _passwordController.text,
+                      confirmation: _confirmController.text,
+                    ),
                   ],
-                ),
-                const SizedBox(height: 12),
-                _Input(
-                  label: 'Nova senha',
-                  hint: 'Nova senha',
-                  icon: Icons.lock_outline,
-                  obscure: true,
-                  controller: _passwordController,
-                  enabled: !_resettingPassword,
-                ),
-                const SizedBox(height: 12),
-                _Input(
-                  label: 'Confirmar nova senha',
-                  hint: 'Confirme a nova senha',
-                  icon: Icons.lock_outline,
-                  obscure: true,
-                  controller: _confirmController,
-                  enabled: !_resettingPassword,
-                ),
-              ],
-            ],
+                ],
+              ),
+            ),
           ),
         ),
       ),
@@ -615,10 +625,22 @@ class _ForgotPasswordDialogState extends State<_ForgotPasswordDialog> {
         ),
         if (_codeSent)
           TextButton(
+            onPressed: _sendingCode || _resettingPassword ? null : _changeEmail,
+            child: const Text('Alterar e-mail'),
+          ),
+        if (_codeSent)
+          TextButton(
             onPressed: _sendingCode || _resettingPassword
                 ? null
                 : _handleSendCode,
             child: const Text('Reenviar código'),
+          ),
+        if (!_codeSent)
+          TextButton(
+            onPressed: _sendingCode || _resettingPassword
+                ? null
+                : _useExistingCode,
+            child: const Text('Já tenho um código'),
           ),
         FilledButton(
           onPressed: _sendingCode || _resettingPassword
@@ -643,21 +665,23 @@ class _ForgotPasswordDialogState extends State<_ForgotPasswordDialog> {
   Future<void> _handleSendCode() async {
     final messenger = ScaffoldMessenger.of(context);
     final email = _emailController.text.trim();
+    final isResending = _codeSent;
 
-    if (email.isEmpty) {
-      messenger.showSnackBar(
-        const SnackBar(content: Text('Informe seu email para continuar')),
-      );
-      return;
-    }
+    _validatingEmailOnly = true;
+    final valid = _formKey.currentState?.validate() ?? false;
+    _validatingEmailOnly = false;
+    if (!valid) return;
 
     FocusScope.of(context).unfocus();
     setState(() => _sendingCode = true);
 
     try {
-      final message = await _service.forgotPassword(email: email);
+      final message = await widget.service.forgotPassword(email: email);
       if (!mounted) return;
-      setState(() => _codeSent = true);
+      setState(() {
+        if (isResending) _clearRecoveryCodeData();
+        _codeSent = true;
+      });
       messenger.showSnackBar(SnackBar(content: Text(message)));
     } catch (e) {
       if (!mounted) return;
@@ -669,29 +693,38 @@ class _ForgotPasswordDialogState extends State<_ForgotPasswordDialog> {
     }
   }
 
+  void _useExistingCode() {
+    _validatingEmailOnly = true;
+    final valid = _formKey.currentState?.validate() ?? false;
+    _validatingEmailOnly = false;
+    if (!valid) return;
+    FocusScope.of(context).unfocus();
+    setState(() => _codeSent = true);
+  }
+
+  void _changeEmail() {
+    setState(() {
+      _codeSent = false;
+      _clearRecoveryCodeData();
+    });
+  }
+
+  void _clearRecoveryCodeData() {
+    _codeController.clear();
+    _passwordController.clear();
+    _confirmController.clear();
+  }
+
   Future<void> _handleResetPassword() async {
     final messenger = ScaffoldMessenger.of(context);
 
-    if (_codeController.text.trim().length != 6) {
-      messenger.showSnackBar(
-        const SnackBar(content: Text('Informe o código de 6 dígitos')),
-      );
-      return;
-    }
-
-    if (_passwordController.text.length < 8 ||
-        _passwordController.text != _confirmController.text) {
-      messenger.showSnackBar(
-        const SnackBar(content: Text('A nova senha está inválida')),
-      );
-      return;
-    }
+    if (!(_formKey.currentState?.validate() ?? false)) return;
 
     FocusScope.of(context).unfocus();
     setState(() => _resettingPassword = true);
 
     try {
-      final message = await _service.resetPassword(
+      final message = await widget.service.resetPassword(
         email: _emailController.text.trim(),
         code: _codeController.text.trim(),
         password: _passwordController.text,
@@ -710,7 +743,15 @@ class _ForgotPasswordDialogState extends State<_ForgotPasswordDialog> {
   }
 
   String _cleanErrorMessage(Object error) {
-    return error.toString().replaceFirst('Exception: ', '');
+    return ApiErrorMessage.forUser(
+      error,
+      fallback:
+          'Não foi possível concluir a recuperação. Tente novamente em instantes.',
+    );
+  }
+
+  void _refreshPasswordRequirements() {
+    if (mounted) setState(() {});
   }
 }
 
@@ -720,12 +761,16 @@ enum PharmacyRegistrationMode { newPharmacy, existingPharmacy }
 
 class RegisterCard extends StatefulWidget {
   final VoidCallback onSwitch;
+  final ValueChanged<String>? onSwitchToLogin;
   final bool isMobile;
+  final AuthService authService;
 
   const RegisterCard({
     super.key,
     required this.onSwitch,
+    this.onSwitchToLogin,
     required this.isMobile,
+    required this.authService,
   });
 
   @override
@@ -733,11 +778,20 @@ class RegisterCard extends StatefulWidget {
 }
 
 class _RegisterCardState extends State<RegisterCard> {
+  final _formKey = GlobalKey<FormState>();
   RegisterProfileType profile = RegisterProfileType.customer;
   PharmacyRegistrationMode pharmacyMode = PharmacyRegistrationMode.newPharmacy;
-  final _authService = AuthService();
 
   final docController = TextEditingController();
+  final cnpjController = TextEditingController();
+  final cpfFormatter = MaskTextInputFormatter(
+    mask: '###.###.###-##',
+    filter: {'#': RegExp(r'[0-9]')},
+  );
+  final cnpjFormatter = MaskTextInputFormatter(
+    mask: '##.###.###/####-##',
+    filter: {'#': RegExp(r'[0-9]')},
+  );
   final nameController = TextEditingController();
   final pharmacyNameController = TextEditingController();
   final cityController = TextEditingController();
@@ -747,29 +801,43 @@ class _RegisterCardState extends State<RegisterCard> {
   final phoneController = TextEditingController();
   final passwordController = TextEditingController();
   final confirmController = TextEditingController();
-  final requestMessageController = TextEditingController();
+  final passwordFocusNode = FocusNode();
+  final confirmationFocusNode = FocusNode();
+  final pharmacySearchController = TextEditingController();
   bool _isSubmitting = false;
+  bool _isSearchingPharmacies = false;
+  bool _hasSearchedPharmacies = false;
+  List<PharmacySearchResult> _pharmacyResults = const [];
+  PharmacySearchResult? _selectedPharmacy;
   bool _loadingCep = false;
-  bool _loadingPharmacies = false;
+  bool _showPassword = false;
+  bool _showPasswordConfirmation = false;
+  String? _uncertainRegistrationEmail;
+  String? _serverEmailError;
+  String? _serverCnpjError;
+  String? _serverPhoneError;
+  int _pharmacyStep = 0;
   String? _lastFetchedCep;
-  List<dynamic> _pharmacies = [];
-  int? _selectedPharmacyId;
 
   bool get isCustomer => profile == RegisterProfileType.customer;
-  bool get isNewPharmacy =>
-      pharmacyMode == PharmacyRegistrationMode.newPharmacy;
+  bool get isExistingPharmacy =>
+      !isCustomer && pharmacyMode == PharmacyRegistrationMode.existingPharmacy;
 
   @override
   void initState() {
     super.initState();
     zipcodeController.addListener(_handleZipcodeChanged);
-    _loadPharmacies();
+    passwordController.addListener(_refreshPasswordRequirements);
+    confirmController.addListener(_refreshPasswordRequirements);
   }
 
   @override
   void dispose() {
     zipcodeController.removeListener(_handleZipcodeChanged);
+    passwordController.removeListener(_refreshPasswordRequirements);
+    confirmController.removeListener(_refreshPasswordRequirements);
     docController.dispose();
+    cnpjController.dispose();
     nameController.dispose();
     pharmacyNameController.dispose();
     cityController.dispose();
@@ -779,7 +847,9 @@ class _RegisterCardState extends State<RegisterCard> {
     phoneController.dispose();
     passwordController.dispose();
     confirmController.dispose();
-    requestMessageController.dispose();
+    passwordFocusNode.dispose();
+    confirmationFocusNode.dispose();
+    pharmacySearchController.dispose();
     super.dispose();
   }
 
@@ -787,94 +857,155 @@ class _RegisterCardState extends State<RegisterCard> {
   Widget build(BuildContext context) {
     return AuthBaseCard(
       title: 'Crie sua conta',
-      subtitle: _isSubmitting ? 'Criando sua conta...' : 'Ja tem conta?',
+      subtitle: _isSubmitting
+          ? 'Criando sua conta...'
+          : 'Cadastre-se para comprar e acompanhar seus pedidos.',
       isMobile: widget.isMobile,
-      child: Column(
-        children: [
-          _ProfileSelector(
-            selectedProfile: profile,
-            onChanged: _isSubmitting
-                ? (_) {}
-                : (value) => setState(() {
-                    profile = value;
-                    if (value == RegisterProfileType.customer) {
-                      pharmacyMode = PharmacyRegistrationMode.newPharmacy;
-                    }
-                  }),
-          ),
-          const SizedBox(height: 16),
-          if (!isCustomer) ...[
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF5FAF8),
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: AppColors.border),
-              ),
-              child: const Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Cadastro de farmacia',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.textDark,
-                    ),
-                  ),
-                  SizedBox(height: 6),
-                  Text(
-                    'Escolha se voce esta cadastrando uma nova farmacia ou se precisa pedir acesso a uma farmacia ja existente.',
-                    style: TextStyle(color: AppColors.textLight, height: 1.4),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-            _PharmacyModeSelector(
-              selectedMode: pharmacyMode,
+      child: Form(
+        key: _formKey,
+        child: Column(
+          children: [
+            _ProfileSelector(
+              selectedProfile: profile,
               onChanged: _isSubmitting
                   ? (_) {}
-                  : (value) => setState(() => pharmacyMode = value),
+                  : (value) => setState(() {
+                      profile = value;
+                      _pharmacyStep = 0;
+                      _serverEmailError = null;
+                      _serverCnpjError = null;
+                      _serverPhoneError = null;
+                    }),
             ),
-            const SizedBox(height: 12),
-          ],
-          _Input(
-            label: isCustomer ? 'CPF' : 'CNPJ',
-            hint: isCustomer ? 'CPF' : 'CNPJ',
-            icon: Icons.badge_outlined,
-            controller: docController,
-            inputFormatters: [isCustomer ? cpfFormatter : cnpjFormatter],
-            enabled: !_isSubmitting,
-          ),
-          const SizedBox(height: 12),
-          _Input(
-            label: isCustomer ? 'Nome completo' : 'Nome do responsavel',
-            hint: isCustomer ? 'Nome completo' : 'Nome do responsavel legal',
-            icon: Icons.person_outline,
-            controller: nameController,
-            enabled: !_isSubmitting,
-          ),
-          if (!isCustomer) ...[
-            if (isNewPharmacy) ...[
+            const SizedBox(height: 16),
+            if (!isCustomer) ...[
+              _PharmacyModeSelector(
+                selectedMode: pharmacyMode,
+                enabled: !_isSubmitting,
+                onChanged: (mode) => setState(() {
+                  pharmacyMode = mode;
+                  _pharmacyStep = 0;
+                  _serverEmailError = null;
+                  _serverCnpjError = null;
+                  _serverPhoneError = null;
+                }),
+              ),
+              const SizedBox(height: 12),
+            ],
+            if (!isCustomer && !isExistingPharmacy) ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF5FAF8),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: const Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Nova farmácia',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textDark,
+                      ),
+                    ),
+                    SizedBox(height: 6),
+                    Text(
+                      'Cadastre a farmácia e o primeiro administrador em uma única operação.',
+                      style: TextStyle(color: AppColors.textLight, height: 1.4),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              _RegistrationSteps(currentStep: _pharmacyStep),
+              const SizedBox(height: 4),
+            ],
+            if (isExistingPharmacy) _buildExistingPharmacyRequest(),
+            if (!isExistingPharmacy && (isCustomer || _pharmacyStep == 1)) ...[
+              _Input(
+                key: const ValueKey('register-document'),
+                label: isCustomer ? 'CPF' : 'CNPJ',
+                hint: isCustomer ? 'CPF' : 'CNPJ',
+                icon: Icons.badge_outlined,
+                controller: isCustomer ? docController : cnpjController,
+                onChanged: isCustomer
+                    ? null
+                    : (_) {
+                        if (_serverCnpjError != null) {
+                          setState(() => _serverCnpjError = null);
+                        }
+                      },
+                inputFormatters: [isCustomer ? cpfFormatter : cnpjFormatter],
+                enabled: !_isSubmitting,
+                keyboardType: TextInputType.number,
+                textInputAction: TextInputAction.next,
+                validator: (value) {
+                  if (!isCustomer && _serverCnpjError != null) {
+                    return _serverCnpjError;
+                  }
+                  final valid = isCustomer
+                      ? isValidCPF(value ?? '')
+                      : isValidCNPJ(value ?? '');
+                  if (valid) return null;
+                  return isCustomer
+                      ? 'Informe um CPF válido.'
+                      : 'Informe um CNPJ válido.';
+                },
+              ),
+              const SizedBox(height: 12),
+            ],
+            if (!isExistingPharmacy && (isCustomer || _pharmacyStep == 0))
+              _Input(
+                key: const ValueKey('register-name'),
+                label: isCustomer ? 'Nome completo' : 'Nome do responsável',
+                hint: isCustomer ? 'Nome completo' : 'Nome completo',
+                icon: Icons.person_outline,
+                controller: nameController,
+                enabled: !_isSubmitting,
+                autofillHints: const [AutofillHints.name],
+                textInputAction: TextInputAction.next,
+                onFieldSubmitted: !isCustomer && !isExistingPharmacy
+                    ? (_) => _advancePharmacyStep()
+                    : null,
+                validator: (value) => isValidRequiredText(value ?? '')
+                    ? null
+                    : 'Informe o nome completo.',
+              ),
+            if (!isCustomer && !isExistingPharmacy && _pharmacyStep == 1) ...[
               const SizedBox(height: 12),
               _Input(
-                label: 'Nome da nova farmacia',
-                hint: 'Nome da farmacia',
+                key: const ValueKey('register-pharmacy-name'),
+                label: 'Nome da nova farmácia',
+                hint: 'Nome da farmácia',
                 icon: Icons.local_pharmacy_outlined,
                 controller: pharmacyNameController,
                 enabled: !_isSubmitting,
+                autofillHints: const [AutofillHints.organizationName],
+                textInputAction: TextInputAction.next,
+                validator: (value) => isValidRequiredText(value ?? '')
+                    ? null
+                    : 'Informe o nome da farmácia.',
               ),
               const SizedBox(height: 12),
               _Input(
+                key: const ValueKey('register-city'),
                 label: 'Cidade',
                 hint: 'Cidade',
                 icon: Icons.location_city_outlined,
                 controller: cityController,
                 enabled: !_isSubmitting,
+                autofillHints: const [AutofillHints.addressCity],
+                textInputAction: TextInputAction.next,
+                validator: (value) => isValidRequiredText(value ?? '')
+                    ? null
+                    : 'Informe a cidade.',
               ),
               const SizedBox(height: 12),
               _Input(
+                key: const ValueKey('register-state'),
                 label: 'UF',
                 hint: 'UF',
                 icon: Icons.map_outlined,
@@ -884,15 +1015,28 @@ class _RegisterCardState extends State<RegisterCard> {
                   FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z]')),
                   LengthLimitingTextInputFormatter(2),
                 ],
+                autofillHints: const [AutofillHints.addressState],
+                textInputAction: TextInputAction.next,
+                validator: (value) => (value ?? '').trim().length == 2
+                    ? null
+                    : 'Informe uma UF valida.',
               ),
               const SizedBox(height: 12),
               _Input(
+                key: const ValueKey('register-zipcode'),
                 label: 'CEP',
                 hint: '00000-000',
                 icon: Icons.markunread_mailbox_outlined,
                 controller: zipcodeController,
                 enabled: !_isSubmitting,
                 inputFormatters: [cepFormatter],
+                keyboardType: TextInputType.number,
+                autofillHints: const [AutofillHints.postalCode],
+                textInputAction: TextInputAction.done,
+                onFieldSubmitted: (_) => _advancePharmacyStep(),
+                validator: (value) => digitsOnly(value ?? '').length == 8
+                    ? null
+                    : 'Informe um CEP válido.',
                 suffix: _loadingCep
                     ? const Padding(
                         padding: EdgeInsets.all(14),
@@ -904,129 +1048,560 @@ class _RegisterCardState extends State<RegisterCard> {
                       )
                     : null,
               ),
-            ] else ...[
-              _PharmacySelectorField(
-                pharmacies: _pharmacies,
-                loading: _loadingPharmacies,
-                selectedPharmacyId: _selectedPharmacyId,
+            ],
+            if (!isExistingPharmacy && (isCustomer || _pharmacyStep == 2)) ...[
+              const SizedBox(height: 12),
+              _Input(
+                key: const ValueKey('register-email'),
+                label: 'Email',
+                hint: 'Email',
+                icon: Icons.email_outlined,
+                controller: emailController,
+                onChanged: (_) {
+                  if (_serverEmailError != null) {
+                    setState(() => _serverEmailError = null);
+                  }
+                },
                 enabled: !_isSubmitting,
-                onChanged: (value) =>
-                    setState(() => _selectedPharmacyId = value),
+                keyboardType: TextInputType.emailAddress,
+                autofillHints: const [AutofillHints.email],
+                textInputAction: TextInputAction.next,
+                validator: (value) {
+                  if (_serverEmailError != null) return _serverEmailError;
+                  return isValidEmail(value ?? '')
+                      ? null
+                      : 'Informe um e-mail válido.';
+                },
               ),
               const SizedBox(height: 12),
               _Input(
-                label: 'Mensagem para o admin',
-                hint:
-                    'Ex.: Sou o responsavel pela unidade e preciso acessar o painel.',
-                icon: Icons.mark_email_read_outlined,
-                controller: requestMessageController,
+                key: const ValueKey('register-phone'),
+                label: 'Telefone',
+                hint: '(00) 00000-0000',
+                icon: Icons.phone_outlined,
+                controller: phoneController,
+                inputFormatters: [phoneFormatter],
+                onChanged: (_) {
+                  if (_serverPhoneError != null) {
+                    setState(() => _serverPhoneError = null);
+                  }
+                },
                 enabled: !_isSubmitting,
-                maxLines: 3,
+                keyboardType: TextInputType.phone,
+                autofillHints: const [AutofillHints.telephoneNumber],
+                textInputAction: isCustomer
+                    ? TextInputAction.next
+                    : TextInputAction.done,
+                onFieldSubmitted: !isCustomer
+                    ? (_) => _advancePharmacyStep()
+                    : null,
+                validator: (value) {
+                  if (_serverPhoneError != null) return _serverPhoneError;
+                  return isValidPhone(value ?? '')
+                      ? null
+                      : 'Informe um telefone válido com DDD.';
+                },
               ),
             ],
-          ],
-          const SizedBox(height: 12),
-          _Input(
-            label: 'Email',
-            hint: 'Email',
-            icon: Icons.email_outlined,
-            controller: emailController,
-            enabled: !_isSubmitting,
-          ),
-          const SizedBox(height: 12),
-          _Input(
-            label: 'Telefone',
-            hint: '(00) 00000-0000',
-            icon: Icons.phone_outlined,
-            controller: phoneController,
-            inputFormatters: [phoneFormatter],
-            enabled: !_isSubmitting,
-          ),
-          const SizedBox(height: 12),
-          _Input(
-            label: 'Senha',
-            hint: 'Senha',
-            icon: Icons.lock_outline,
-            obscure: true,
-            controller: passwordController,
-            enabled: !_isSubmitting,
-          ),
-          const SizedBox(height: 12),
-          _Input(
-            label: 'Confirmar senha',
-            hint: 'Confirmar senha',
-            icon: Icons.lock_outline,
-            obscure: true,
-            controller: confirmController,
-            enabled: !_isSubmitting,
-          ),
-          const SizedBox(height: 20),
-          SizedBox(
-            width: double.infinity,
-            height: 48,
-            child: SaveMedButton(
-              loading: _isSubmitting,
-              onPressed: _isSubmitting ? null : () => _handleRegister(context),
-              label: 'Criar conta',
+            if (!isExistingPharmacy && (isCustomer || _pharmacyStep == 3)) ...[
+              const SizedBox(height: 12),
+              if (!isCustomer) ...[
+                const _RegistrationNotice(
+                  icon: Icons.check_circle_outline,
+                  text:
+                      'A farmácia e o acesso administrativo serão ativados imediatamente. Depois do cadastro, entre com o e-mail e a senha informados.',
+                ),
+                const SizedBox(height: 12),
+              ],
+              _Input(
+                key: const ValueKey('register-password'),
+                label: 'Senha',
+                hint: 'Crie uma senha',
+                icon: Icons.lock_outline,
+                obscure: !_showPassword,
+                controller: passwordController,
+                focusNode: passwordFocusNode,
+                enabled: !_isSubmitting,
+                autofillHints: const [AutofillHints.newPassword],
+                textInputAction: TextInputAction.next,
+                onFieldSubmitted: (_) => confirmationFocusNode.requestFocus(),
+                validator: (value) => validatePasswordLength(value ?? ''),
+                suffix: IconButton(
+                  tooltip: _showPassword ? 'Ocultar senha' : 'Mostrar senha',
+                  onPressed: _isSubmitting
+                      ? null
+                      : () => setState(() => _showPassword = !_showPassword),
+                  icon: Icon(
+                    _showPassword ? Icons.visibility_off : Icons.visibility,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              _Input(
+                key: const ValueKey('register-password-confirmation'),
+                label: 'Confirmar senha',
+                hint: 'Repita a senha',
+                icon: Icons.lock_outline,
+                obscure: !_showPasswordConfirmation,
+                controller: confirmController,
+                focusNode: confirmationFocusNode,
+                enabled: !_isSubmitting,
+                autofillHints: const [AutofillHints.newPassword],
+                textInputAction: TextInputAction.done,
+                onFieldSubmitted: (_) => _handleRegister(context),
+                validator: (value) => validatePasswordConfirmation(
+                  passwordController.text,
+                  value ?? '',
+                ),
+                suffix: IconButton(
+                  tooltip: _showPasswordConfirmation
+                      ? 'Ocultar confirmação'
+                      : 'Mostrar confirmação',
+                  onPressed: _isSubmitting
+                      ? null
+                      : () => setState(
+                          () => _showPasswordConfirmation =
+                              !_showPasswordConfirmation,
+                        ),
+                  icon: Icon(
+                    _showPasswordConfirmation
+                        ? Icons.visibility_off
+                        : Icons.visibility,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              PasswordRequirements(
+                password: passwordController.text,
+                confirmation: confirmController.text,
+              ),
+            ],
+            if (_uncertainRegistrationEmail != null) ...[
+              const SizedBox(height: 12),
+              Semantics(
+                liveRegion: true,
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFF4E5),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFFE4BC76)),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(Icons.info_outline, color: Color(0xFF80530D)),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Não foi possível confirmar se a conta foi criada '
+                          'usando ${_uncertainRegistrationEmail!}. Tente '
+                          'entrar com esse endereço antes de enviar novamente.',
+                          style: TextStyle(
+                            color: AppColors.textDark,
+                            height: 1.4,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  key: const ValueKey('registration-uncertain-login'),
+                  onPressed: _isSubmitting
+                      ? null
+                      : () {
+                          final email = _uncertainRegistrationEmail;
+                          if (email != null && widget.onSwitchToLogin != null) {
+                            widget.onSwitchToLogin!(email);
+                          } else {
+                            widget.onSwitch();
+                          }
+                        },
+                  icon: const Icon(Icons.login),
+                  label: const Text('Ir para login'),
+                ),
+              ),
+            ],
+            const SizedBox(height: 20),
+            if (isExistingPharmacy)
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: SaveMedButton(
+                  loading: _isSubmitting,
+                  onPressed: _isSubmitting ? null : _handleAccessRequest,
+                  label: 'Enviar solicitação',
+                ),
+              )
+            else if (isCustomer)
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: SaveMedButton(
+                  loading: _isSubmitting,
+                  onPressed: _isSubmitting
+                      ? null
+                      : () => _handleRegister(context),
+                  label: 'Criar conta',
+                ),
+              )
+            else
+              Row(
+                children: [
+                  if (_pharmacyStep > 0) ...[
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: _isSubmitting
+                            ? null
+                            : () => setState(() => _pharmacyStep--),
+                        icon: const Icon(Icons.arrow_back),
+                        label: const Text('Voltar'),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                  ],
+                  Expanded(
+                    child: SizedBox(
+                      height: 48,
+                      child: _pharmacyStep < 3
+                          ? FilledButton.icon(
+                              onPressed: _isSubmitting
+                                  ? null
+                                  : _advancePharmacyStep,
+                              icon: const Icon(Icons.arrow_forward),
+                              label: const Text('Continuar'),
+                            )
+                          : SaveMedButton(
+                              loading: _isSubmitting,
+                              onPressed: _isSubmitting
+                                  ? null
+                                  : () => _handleRegister(context),
+                              label: 'Criar conta e farmácia',
+                            ),
+                    ),
+                  ),
+                ],
+              ),
+            const SizedBox(height: 12),
+            TextButton(
+              onPressed: _isSubmitting ? null : widget.onSwitch,
+              child: const Text('Fazer login'),
             ),
-          ),
-          const SizedBox(height: 12),
-          TextButton(
-            onPressed: _isSubmitting ? null : widget.onSwitch,
-            child: const Text('Fazer login'),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
-  Future<void> _handleRegister(BuildContext context) async {
-    final messenger = ScaffoldMessenger.of(context);
-    final authController = context.read<AuthController>();
-    final valid = isCustomer
-        ? isValidCPF(docController.text)
-        : isValidCNPJ(docController.text);
+  Widget _buildExistingPharmacyRequest() {
+    return Column(
+      children: [
+        const _RegistrationNotice(
+          icon: Icons.verified_user_outlined,
+          text:
+              'Busque por nome, cidade, CNPJ ou ID. A solicitação não pede senha. Após a aprovação, você receberá um código para definir a sua.',
+        ),
+        const SizedBox(height: 12),
+        TextFormField(
+          key: const ValueKey('access-pharmacy-search'),
+          controller: pharmacySearchController,
+          enabled: !_isSubmitting && !_isSearchingPharmacies,
+          textInputAction: TextInputAction.search,
+          onFieldSubmitted: (_) => _searchPharmacies(),
+          decoration: InputDecoration(
+            labelText: 'Buscar farmácia',
+            hintText: 'Nome ou CNPJ',
+            prefixIcon: const Icon(Icons.search),
+            suffixIcon: _isSearchingPharmacies
+                ? const Padding(
+                    padding: EdgeInsets.all(14),
+                    child: SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  )
+                : IconButton(
+                    tooltip: 'Buscar farmácia',
+                    onPressed: _searchPharmacies,
+                    icon: const Icon(Icons.arrow_forward),
+                  ),
+          ),
+        ),
+        if (_hasSearchedPharmacies && _pharmacyResults.isEmpty) ...[
+          const SizedBox(height: 10),
+          const _RegistrationNotice(
+            icon: Icons.search_off_outlined,
+            text:
+                'Nenhuma farmácia encontrada. Revise a busca ou escolha Nova farmácia.',
+          ),
+        ],
+        if (_pharmacyResults.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          FormField<PharmacySearchResult>(
+            key: ValueKey(
+              'access-pharmacy-options-${_pharmacyResults.map((item) => item.id).join('-')}',
+            ),
+            initialValue: _selectedPharmacy,
+            validator: (value) => value == null
+                ? 'Selecione a farmácia para a qual deseja acesso.'
+                : null,
+            builder: (field) => Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxHeight: 240),
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    itemCount: _pharmacyResults.length,
+                    separatorBuilder: (_, __) => const Divider(height: 1),
+                    itemBuilder: (context, index) {
+                      final pharmacy = _pharmacyResults[index];
+                      final selected = field.value?.id == pharmacy.id;
+                      final details = [
+                        if (pharmacy.location.isNotEmpty) pharmacy.location,
+                        if (pharmacy.maskedCnpj != null) pharmacy.maskedCnpj!,
+                        'ID ${pharmacy.id}',
+                      ].join(' | ');
+                      return ListTile(
+                        selected: selected,
+                        onTap: _isSubmitting
+                            ? null
+                            : () {
+                                field.didChange(pharmacy);
+                                setState(() => _selectedPharmacy = pharmacy);
+                              },
+                        leading: Icon(
+                          selected
+                              ? Icons.radio_button_checked
+                              : Icons.radio_button_unchecked,
+                          color: selected ? AppColors.primary : null,
+                        ),
+                        title: Text(pharmacy.name),
+                        subtitle: Text(details),
+                      );
+                    },
+                  ),
+                ),
+                if (field.hasError) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    field.errorText!,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+        const SizedBox(height: 12),
+        _Input(
+          key: const ValueKey('access-responsible-name'),
+          label: 'Nome do responsável',
+          hint: 'Nome completo',
+          icon: Icons.person_outline,
+          controller: nameController,
+          enabled: !_isSubmitting,
+          autofillHints: const [AutofillHints.name],
+          textInputAction: TextInputAction.next,
+          validator: (value) => isValidRequiredText(value ?? '')
+              ? null
+              : 'Informe o nome completo.',
+        ),
+        const SizedBox(height: 12),
+        _Input(
+          key: const ValueKey('access-responsible-document'),
+          label: 'CPF do responsável',
+          hint: '000.000.000-00',
+          icon: Icons.badge_outlined,
+          controller: docController,
+          inputFormatters: [cpfFormatter],
+          enabled: !_isSubmitting,
+          keyboardType: TextInputType.number,
+          textInputAction: TextInputAction.next,
+          validator: (value) =>
+              isValidCPF(value ?? '') ? null : 'Informe um CPF válido.',
+        ),
+        const SizedBox(height: 12),
+        _Input(
+          key: const ValueKey('access-email'),
+          label: 'Email',
+          hint: 'responsavel@empresa.com.br',
+          icon: Icons.email_outlined,
+          controller: emailController,
+          enabled: !_isSubmitting,
+          keyboardType: TextInputType.emailAddress,
+          autofillHints: const [AutofillHints.email],
+          textInputAction: TextInputAction.next,
+          validator: (value) =>
+              isValidEmail(value ?? '') ? null : 'Informe um e-mail válido.',
+        ),
+        const SizedBox(height: 12),
+        _Input(
+          key: const ValueKey('access-phone'),
+          label: 'Telefone',
+          hint: '(00) 00000-0000',
+          icon: Icons.phone_outlined,
+          controller: phoneController,
+          inputFormatters: [phoneFormatter],
+          enabled: !_isSubmitting,
+          keyboardType: TextInputType.phone,
+          autofillHints: const [AutofillHints.telephoneNumber],
+          textInputAction: TextInputAction.done,
+          onFieldSubmitted: (_) => _handleAccessRequest(),
+          validator: (value) => isValidPhone(value ?? '')
+              ? null
+              : 'Informe um telefone válido com DDD.',
+        ),
+      ],
+    );
+  }
 
-    if (!valid) {
-      messenger.showSnackBar(
-        SnackBar(content: Text(isCustomer ? 'CPF invalido' : 'CNPJ invalido')),
-      );
-      return;
-    }
-
-    if (!isCustomer &&
-        isNewPharmacy &&
-        (pharmacyNameController.text.trim().isEmpty ||
-            cityController.text.trim().isEmpty ||
-            stateController.text.trim().length != 2 ||
-            zipcodeController.text.replaceAll(RegExp(r'\D'), '').length != 8)) {
-      messenger.showSnackBar(
+  Future<void> _searchPharmacies() async {
+    final query = pharmacySearchController.text.trim();
+    if (query.length < 2) {
+      ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Preencha nome da farmacia, cidade, UF e CEP validos'),
+          content: Text('Digite ao menos 2 caracteres para buscar.'),
         ),
       );
       return;
     }
-
-    if (!isCustomer && !isNewPharmacy && _selectedPharmacyId == null) {
-      messenger.showSnackBar(
-        const SnackBar(
+    FocusScope.of(context).unfocus();
+    setState(() => _isSearchingPharmacies = true);
+    try {
+      final results = await widget.authService.searchPharmaciesForAccess(query);
+      if (!mounted) return;
+      setState(() {
+        _pharmacyResults = results;
+        _selectedPharmacy = null;
+        _hasSearchedPharmacies = true;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
           content: Text(
-            'Selecione a farmacia ja cadastrada para solicitar acesso',
+            ApiErrorMessage.forUser(
+              error,
+              fallback: 'Não foi possível buscar farmácias. Tente novamente.',
+            ),
           ),
         ),
       );
+    } finally {
+      if (mounted) setState(() => _isSearchingPharmacies = false);
+    }
+  }
+
+  Future<void> _handleAccessRequest() async {
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+    final pharmacy = _selectedPharmacy;
+    if (pharmacy == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Busque e selecione uma farmácia.')),
+      );
       return;
     }
-
-    if (passwordController.text.length < 8 ||
-        passwordController.text != confirmController.text) {
-      messenger.showSnackBar(const SnackBar(content: Text('Senha invalida')));
-      return;
-    }
-
     FocusScope.of(context).unfocus();
-    setState(() => _isSubmitting = true);
+    setState(() {
+      _isSubmitting = true;
+    });
+    try {
+      final message = await widget.authService.requestPharmacyAccess(
+        PharmacyAccessRequest(
+          pharmacyId: pharmacy.id,
+          responsibleName: nameController.text,
+          responsibleDocument: docController.text,
+          email: emailController.text,
+          phone: phoneController.text,
+        ),
+      );
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Solicitação enviada'),
+          content: Text(
+            '$message Acompanhe as próximas instruções pelo e-mail informado.',
+          ),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Entendi'),
+            ),
+          ],
+        ),
+      );
+      if (mounted) widget.onSwitch();
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            ApiErrorMessage.forUser(
+              error,
+              fallback:
+                  'Não foi possível enviar a solicitação. Tente novamente.',
+            ),
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
+  }
+
+  void _advancePharmacyStep() {
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+    FocusScope.of(context).unfocus();
+    setState(() => _pharmacyStep++);
+  }
+
+  Future<void> _handleRegister(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final focusScope = FocusScope.of(context);
+    final authController = context.read<AuthController>();
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+
+    if (_uncertainRegistrationEmail != null) {
+      final shouldRetry = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Confirmar novo envio'),
+          content: Text(
+            'A tentativa anterior para $_uncertainRegistrationEmail pode ter '
+            'criado a conta. Tente entrar com esse endereço antes de enviar '
+            'novamente. Quer continuar mesmo assim?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Enviar novamente'),
+            ),
+          ],
+        ),
+      );
+      if (shouldRetry != true || !mounted) return;
+    }
+
+    focusScope.unfocus();
+    setState(() {
+      _isSubmitting = true;
+      _uncertainRegistrationEmail = null;
+    });
 
     try {
       await authController.register(
@@ -1034,41 +1609,57 @@ class _RegisterCardState extends State<RegisterCard> {
         name: nameController.text.trim(),
         email: emailController.text.trim(),
         password: passwordController.text,
-        document: docController.text,
+        document: isCustomer ? docController.text : cnpjController.text,
         phone: phoneController.text,
-        useExistingPharmacy: !isCustomer && !isNewPharmacy,
-        pharmacyId: isCustomer ? null : _selectedPharmacyId,
-        pharmacyName: isCustomer || !isNewPharmacy
-            ? null
-            : pharmacyNameController.text.trim(),
-        city: isCustomer || !isNewPharmacy ? null : cityController.text.trim(),
-        state: isCustomer || !isNewPharmacy
-            ? null
-            : stateController.text.trim().toUpperCase(),
-        zipcode: isCustomer || !isNewPharmacy
-            ? null
-            : zipcodeController.text.trim(),
-        requestMessage: isCustomer || isNewPharmacy
-            ? null
-            : requestMessageController.text.trim(),
+        pharmacyName: isCustomer ? null : pharmacyNameController.text.trim(),
+        city: isCustomer ? null : cityController.text.trim(),
+        state: isCustomer ? null : stateController.text.trim().toUpperCase(),
+        zipcode: isCustomer ? null : zipcodeController.text.trim(),
       );
 
       if (!mounted) return;
+      TextInput.finishAutofillContext(shouldSave: true);
       messenger.showSnackBar(
-        SnackBar(
+        const SnackBar(
           content: Text(
-            isCustomer
-                ? 'Conta criada com sucesso'
-                : isNewPharmacy
-                ? 'Conta de farmacia criada com sucesso. Verifique seu email.'
-                : 'Solicitacao enviada para aprovacao da farmacia. Verifique seu email.',
+            'Conta criada com sucesso. Agora entre com seu e-mail e senha.',
           ),
         ),
       );
       widget.onSwitch();
     } catch (e) {
       if (!mounted) return;
-      messenger.showSnackBar(SnackBar(content: Text(_mapRegisterError(e))));
+      final outcomeUnknown = RegistrationErrorMapper.hasUncertainOutcome(e);
+      if (outcomeUnknown) {
+        setState(
+          () => _uncertainRegistrationEmail = emailController.text.trim(),
+        );
+      } else {
+        final fieldError = RegistrationErrorMapper.fieldError(e);
+        if (fieldError != null) {
+          setState(() {
+            if (fieldError.$1 == 'email') {
+              _serverEmailError = fieldError.$2;
+              if (!isCustomer) _pharmacyStep = 2;
+            } else if (fieldError.$1 == 'phone') {
+              _serverPhoneError = fieldError.$2;
+              if (!isCustomer) _pharmacyStep = 2;
+            } else {
+              _serverCnpjError = fieldError.$2;
+              _pharmacyStep = 1;
+            }
+          });
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) _formKey.currentState?.validate();
+          });
+        }
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(RegistrationErrorMapper.message(e)),
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
     } finally {
       if (mounted) {
         setState(() => _isSubmitting = false);
@@ -1076,23 +1667,8 @@ class _RegisterCardState extends State<RegisterCard> {
     }
   }
 
-  String _mapRegisterError(Object error) {
-    final message = error.toString();
-    final normalized = message.toLowerCase();
-
-    if (normalized.contains('email ja cadastrado')) {
-      return 'Este email ja esta em uso.';
-    }
-
-    if (normalized.contains('pharmacy_id')) {
-      return 'Nao foi possivel vincular a farmacia ao usuario. Tente novamente.';
-    }
-
-    return message.replaceFirst('Exception: ', '');
-  }
-
   void _handleZipcodeChanged() {
-    if (isCustomer || !isNewPharmacy) return;
+    if (isCustomer) return;
 
     final rawCep = zipcodeController.text.replaceAll(RegExp(r'\D'), '');
     if (rawCep.length != 8 || rawCep == _lastFetchedCep || _loadingCep) return;
@@ -1100,42 +1676,120 @@ class _RegisterCardState extends State<RegisterCard> {
     _fetchCep(rawCep);
   }
 
+  void _refreshPasswordRequirements() {
+    if (mounted) setState(() {});
+  }
+
   Future<void> _fetchCep(String rawCep) async {
     setState(() => _loadingCep = true);
 
     try {
-      final response = await http.get(
-        Uri.parse('https://viacep.com.br/ws/$rawCep/json/'),
-      );
-      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      final address = await CepLookupService.lookup(rawCep);
+      if (address == null) return;
 
-      if (data['erro'] == true) return;
-
-      cityController.text = (data['localidade'] ?? '').toString();
-      stateController.text = (data['uf'] ?? '').toString().toUpperCase();
+      cityController.text = address.city;
+      stateController.text = address.state;
       _lastFetchedCep = rawCep;
     } catch (_) {
-      // Ignora falhas de CEP e deixa o preenchimento manual disponivel.
+      // Ignora falhas de CEP e deixa o preenchimento manual disponível.
     } finally {
       if (mounted) {
         setState(() => _loadingCep = false);
       }
     }
   }
+}
 
-  Future<void> _loadPharmacies() async {
-    setState(() => _loadingPharmacies = true);
-    try {
-      final pharmacies = await _authService.listPharmacies();
-      if (!mounted) return;
-      setState(() => _pharmacies = pharmacies);
-    } catch (_) {
-      if (!mounted) return;
-    } finally {
-      if (mounted) {
-        setState(() => _loadingPharmacies = false);
-      }
-    }
+class _RegistrationSteps extends StatelessWidget {
+  final int currentStep;
+
+  const _RegistrationSteps({required this.currentStep});
+
+  static const _labels = ['Responsável', 'Farmácia', 'Contato', 'Segurança'];
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      container: true,
+      label:
+          'Etapa ${currentStep + 1} de ${_labels.length}: ${_labels[currentStep]}',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Etapa ${currentStep + 1} de ${_labels.length}',
+            style: const TextStyle(
+              color: AppColors.textLight,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: List.generate(_labels.length, (index) {
+              final active = index <= currentStep;
+              return Expanded(
+                child: Container(
+                  height: 4,
+                  margin: EdgeInsets.only(
+                    right: index == _labels.length - 1 ? 0 : 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: active ? AppColors.primary : AppColors.border,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              );
+            }),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _labels[currentStep],
+            style: const TextStyle(
+              color: AppColors.textDark,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RegistrationNotice extends StatelessWidget {
+  final IconData icon;
+  final String text;
+
+  const _RegistrationNotice({required this.icon, required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 18, color: AppColors.primaryDark),
+          const SizedBox(width: 9),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(
+                color: AppColors.textDark,
+                fontSize: 12,
+                height: 1.4,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -1147,10 +1801,17 @@ class _Input extends StatelessWidget {
   final bool enabled;
   final List<TextInputFormatter>? inputFormatters;
   final TextEditingController? controller;
+  final FocusNode? focusNode;
   final Widget? suffix;
-  final int maxLines;
+  final TextInputType? keyboardType;
+  final Iterable<String>? autofillHints;
+  final String? Function(String?)? validator;
+  final TextInputAction? textInputAction;
+  final ValueChanged<String>? onFieldSubmitted;
+  final ValueChanged<String>? onChanged;
 
   const _Input({
+    super.key,
     required this.label,
     required this.hint,
     required this.icon,
@@ -1158,8 +1819,14 @@ class _Input extends StatelessWidget {
     this.enabled = true,
     this.inputFormatters,
     this.controller,
+    this.focusNode,
     this.suffix,
-    this.maxLines = 1,
+    this.keyboardType,
+    this.autofillHints,
+    this.validator,
+    this.textInputAction,
+    this.onFieldSubmitted,
+    this.onChanged,
   });
 
   @override
@@ -1167,16 +1834,32 @@ class _Input extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontSize: 13)),
+        ExcludeSemantics(
+          child: Text(label, style: const TextStyle(fontSize: 13)),
+        ),
         const SizedBox(height: 6),
-        TextField(
+        TextFormField(
           controller: controller,
+          focusNode: focusNode,
           enabled: enabled,
           obscureText: obscure,
           inputFormatters: inputFormatters,
-          maxLines: obscure ? 1 : maxLines,
+          keyboardType: keyboardType,
+          autofillHints: autofillHints,
+          validator: validator,
+          textInputAction: textInputAction,
+          onFieldSubmitted: onFieldSubmitted,
+          onChanged: onChanged,
+          autovalidateMode: AutovalidateMode.onUserInteraction,
+          maxLines: 1,
           decoration: InputDecoration(
-            hintText: hint,
+            hint: Text(
+              hint,
+              semanticsLabel: label,
+              style: Theme.of(context).textTheme.bodyLarge?.merge(
+                Theme.of(context).inputDecorationTheme.hintStyle,
+              ),
+            ),
             prefixIcon: Icon(icon),
             suffixIcon: suffix,
             filled: true,
@@ -1201,43 +1884,27 @@ class _ProfileSelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isCustomerActive = selectedProfile == RegisterProfileType.customer;
-
-    return Row(
-      children: [
-        _button(
-          'Cliente',
-          isCustomerActive,
-          () => onChanged(RegisterProfileType.customer),
-        ),
-        const SizedBox(width: 8),
-        _button(
-          'Farmacia',
-          !isCustomerActive,
-          () => onChanged(RegisterProfileType.pharmacy),
-        ),
-      ],
-    );
-  }
-
-  Widget _button(String text, bool active, VoidCallback onTap) {
-    return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          height: 40,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: active ? AppColors.primary : const Color(0xFFE8F0F0),
-            borderRadius: BorderRadius.circular(8),
+    return SizedBox(
+      width: double.infinity,
+      child: SegmentedButton<RegisterProfileType>(
+        segments: const [
+          ButtonSegment(
+            value: RegisterProfileType.customer,
+            icon: Icon(Icons.person_outline),
+            label: Text('Cliente'),
           ),
-          child: Text(
-            text,
-            style: TextStyle(
-              color: active ? Colors.white : Colors.black87,
-              fontWeight: FontWeight.w600,
-            ),
+          ButtonSegment(
+            value: RegisterProfileType.pharmacy,
+            icon: Icon(Icons.local_pharmacy_outlined),
+            label: Text('Farmácia'),
           ),
+        ],
+        selected: {selectedProfile},
+        onSelectionChanged: (selection) => onChanged(selection.first),
+        showSelectedIcon: false,
+        expandedInsets: EdgeInsets.zero,
+        style: const ButtonStyle(
+          minimumSize: WidgetStatePropertyAll(Size.fromHeight(48)),
         ),
       ),
     );
@@ -1246,139 +1913,38 @@ class _ProfileSelector extends StatelessWidget {
 
 class _PharmacyModeSelector extends StatelessWidget {
   final PharmacyRegistrationMode selectedMode;
+  final bool enabled;
   final ValueChanged<PharmacyRegistrationMode> onChanged;
 
   const _PharmacyModeSelector({
     required this.selectedMode,
-    required this.onChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: _modeCard(
-            title: 'Nova farmacia',
-            subtitle: 'Crio a farmacia e a conta admin agora',
-            active: selectedMode == PharmacyRegistrationMode.newPharmacy,
-            onTap: () => onChanged(PharmacyRegistrationMode.newPharmacy),
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: _modeCard(
-            title: 'Ja cadastrada',
-            subtitle: 'Peço aprovacao para entrar em uma farmacia existente',
-            active: selectedMode == PharmacyRegistrationMode.existingPharmacy,
-            onTap: () => onChanged(PharmacyRegistrationMode.existingPharmacy),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _modeCard({
-    required String title,
-    required String subtitle,
-    required bool active,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(18),
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: active
-              ? AppColors.primary.withValues(alpha: 0.08)
-              : Colors.white,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-            color: active ? AppColors.primary : AppColors.border,
-            width: active ? 1.4 : 1,
-          ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              title,
-              style: TextStyle(
-                fontWeight: FontWeight.w800,
-                color: active ? AppColors.primaryDark : AppColors.textDark,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              subtitle,
-              style: const TextStyle(
-                color: AppColors.textLight,
-                fontSize: 12,
-                height: 1.35,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _PharmacySelectorField extends StatelessWidget {
-  final List<dynamic> pharmacies;
-  final bool loading;
-  final int? selectedPharmacyId;
-  final bool enabled;
-  final ValueChanged<int?> onChanged;
-
-  const _PharmacySelectorField({
-    required this.pharmacies,
-    required this.loading,
-    required this.selectedPharmacyId,
     required this.enabled,
     required this.onChanged,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Minha farmacia ja esta cadastrada',
-          style: TextStyle(fontSize: 13),
-        ),
-        const SizedBox(height: 6),
-        DropdownButtonFormField<int>(
-          initialValue: selectedPharmacyId,
-          isExpanded: true,
-          decoration: InputDecoration(
-            prefixIcon: const Icon(Icons.store_mall_directory_outlined),
-            filled: true,
-            fillColor: enabled
-                ? const Color(0xFFF8F9FB)
-                : AppColors.surfaceMuted,
-            hintText: loading
-                ? 'Carregando farmacias...'
-                : 'Selecione a farmacia',
+    return SizedBox(
+      width: double.infinity,
+      child: SegmentedButton<PharmacyRegistrationMode>(
+        segments: const [
+          ButtonSegment(
+            value: PharmacyRegistrationMode.newPharmacy,
+            icon: Icon(Icons.add_business_outlined),
+            label: Text('Nova farmácia'),
           ),
-          items: pharmacies.map((item) {
-            final pharmacy = item as Map<String, dynamic>;
-            final city = pharmacy['CITY']?.toString() ?? '';
-            final state = pharmacy['STATE']?.toString() ?? '';
-            final suffix = [city, state].where((e) => e.isNotEmpty).join(' - ');
-            final label = suffix.isEmpty
-                ? (pharmacy['NAME']?.toString() ?? 'Farmacia')
-                : '${pharmacy['NAME']} ($suffix)';
-            return DropdownMenuItem<int>(
-              value: pharmacy['ID'] as int,
-              child: Text(label, overflow: TextOverflow.ellipsis),
-            );
-          }).toList(),
-          onChanged: enabled && !loading ? onChanged : null,
-        ),
-      ],
+          ButtonSegment(
+            value: PharmacyRegistrationMode.existingPharmacy,
+            icon: Icon(Icons.how_to_reg_outlined),
+            label: Text('Solicitar acesso'),
+          ),
+        ],
+        selected: {selectedMode},
+        onSelectionChanged: enabled
+            ? (selection) => onChanged(selection.first)
+            : null,
+        showSelectedIcon: false,
+      ),
     );
   }
 }

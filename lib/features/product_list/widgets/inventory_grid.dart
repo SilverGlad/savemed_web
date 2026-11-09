@@ -3,27 +3,47 @@ import 'package:provider/provider.dart';
 
 import '../../../core/controllers/inventory_controller.dart';
 import '../../../core/widgets/inventory_card.dart';
+import '../../../core/widgets/catalog_layout.dart';
 
 class InventoryGrid extends StatelessWidget {
-  const InventoryGrid({super.key});
+  final double horizontalPadding;
+
+  const InventoryGrid({super.key, this.horizontalPadding = 16});
 
   @override
   Widget build(BuildContext context) {
     final controller = context.watch<InventoryController>();
     final width = MediaQuery.of(context).size.width;
 
-    int columns = 2;
-    if (width > 1200) {
-      columns = 4;
-    } else if (width > 900) {
-      columns = 3;
-    }
+    final columns = CatalogLayout.columns(
+      context,
+      width - horizontalPadding * 2,
+    );
 
     if (controller.loading) {
       return const SliverToBoxAdapter(
         child: Padding(
           padding: EdgeInsets.all(32),
           child: Center(child: CircularProgressIndicator()),
+        ),
+      );
+    }
+
+    if (controller.error != null) {
+      return SliverToBoxAdapter(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            children: [
+              const Text('Não foi possível carregar os produtos.'),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: controller.load,
+                icon: const Icon(Icons.refresh),
+                label: const Text('Tentar novamente'),
+              ),
+            ],
+          ),
         ),
       );
     }
@@ -38,16 +58,16 @@ class InventoryGrid extends StatelessWidget {
     }
 
     return SliverPadding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
       sliver: SliverGrid(
         delegate: SliverChildBuilderDelegate((context, index) {
           return InventoryCard(item: controller.items[index]);
         }, childCount: controller.items.length),
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: columns,
-          mainAxisSpacing: 24,
-          crossAxisSpacing: 24,
-          childAspectRatio: 0.65,
+          mainAxisSpacing: 12,
+          crossAxisSpacing: 12,
+          mainAxisExtent: CatalogLayout.cardHeight(context),
         ),
       ),
     );

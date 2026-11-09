@@ -1,5 +1,5 @@
 import 'package:flutter/foundation.dart' hide Category;
-import 'package:SaveMed/models/subcategory.dart';
+import 'package:savemed/models/subcategory.dart';
 
 import '../../models/category.dart';
 import '../services/category_service.dart';
@@ -16,10 +16,12 @@ class CategoryController extends ChangeNotifier {
     loading = true;
     notifyListeners();
 
-    categories = await categoryService.getCategories();
-
-    loading = false;
-    notifyListeners();
+    try {
+      categories = await categoryService.getCategories();
+    } finally {
+      loading = false;
+      notifyListeners();
+    }
   }
 
   List<Subcategory> subcategoriesOf(int categoryId) {
